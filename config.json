@@ -1,0 +1,57 @@
+{
+  "latitude": 28.5383,
+  "longitude": -81.3792,
+  "temperatureUnit": "fahrenheit",
+  "windSpeedUnit": "mph",
+  "rssFeeds": [
+    "https://news.ycombinator.com/rss",
+    "https://www.theverge.com/rss/index.xml"
+  ],
+  "theme": "auto",
+  "refresh": {
+    "metricsMs": 1500,
+    "weatherMs": 600000,
+    "rssMs": 600000
+  },
+  "apps": [
+    {
+      "id": "dashboard-0",
+      "type": "dashboard",
+      "label": "Home",
+      "icon": "🏠"
+    },
+    {
+      "id": "web-1",
+      "type": "web",
+      "label": "Music",
+      "icon": "🌐",
+      "url": "https://music.youtube.com/"
+    },
+    {
+      "id": "chatgpt-2",
+      "type": "chatgpt",
+      "label": "ChatGPT",
+      "icon": "🤖",
+      "url": "https://chatgpt.com"
+    },
+    {
+      "id": "weather-3",
+      "type": "weather",
+      "label": "Weather",
+      "icon": "⛅"
+    },
+    {
+      "id": "system-4",
+      "type": "system",
+      "label": "System",
+      "icon": "🖥️"
+    },
+    {
+      "id": "web-5",
+      "type": "web",
+      "label": "Ring",
+      "icon": "❖",
+      "url": "https://ring.com/"
+    }
+  ]
+}

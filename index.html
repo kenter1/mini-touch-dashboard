@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: http: 'unsafe-inline' 'unsafe-eval' data:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mini Touch Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --fg: #e8eefc;
+      --muted: #97a3b6;
+      --card: #121828;
+      --accent: #4da3ff;
+      --good: #2ecc71;
+      --warn: #f1c40f;
+      --bad: #e74c3c;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg:#f5f7fb; --fg:#0b0f1a; --muted:#4a5568; --card:#ffffff; --accent:#1e88e5; }
+    }
+    html, body {
+      height: 100%; margin: 0; background: var(--bg); color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Segoe UI Emoji", "Segoe UI Symbol";
+      user-select: none;
+      overflow: hidden;
+    }
+    .app {
+      position: relative;
+      height: 100%;
+      box-sizing: border-box;
+      padding-left: 96px; /* space for larger sidebar */
+    }
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 88px;
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 10px 8px; box-sizing: border-box;
+      z-index: 1000; /* ensure sidebar is above main content & webviews */
+    }
+    .sidebar .top, .sidebar .bottom { display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; }
+    .sidebar .spacer { flex: 1; }
+    .sidebar .s-item { display:flex; flex-direction:column; align-items:center; gap:6px; width:100%; }
+    .sidebar .btn {
+      width: 72px; height: 72px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.10);
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      background: var(--card); color: var(--fg); font-size: 30px; user-select: none;
+      transition: transform 0.08s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+    .sidebar .btn:hover { transform: translateY(-1px); }
+    .sidebar .btn.active { outline: 2px solid var(--accent); }
+    .sidebar .s-label { font-size: 11px; color: var(--muted); text-align: center; width: 100%; line-height: 1.1; }
+    .sidebar .btn.disabled { opacity: 0.4; pointer-events: none; }
+    .sidebar .btn.sm { width: 44px; height: 44px; border-radius: 12px; font-size: 18px; }
+    .sidebar .s-row { display:flex; gap:8px; align-items:center; justify-content:center; width:100%; }
+
+    /* Use left/right arrows for pager buttons */
+    .sidebar .btn.sm[data-nav] { font-size: 0; }
+    .sidebar .btn.sm[data-nav="up"]::before { content: '←'; font-size: 18px; }
+    .sidebar .btn.sm[data-nav="down"]::before { content: '→'; font-size: 18px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+      padding: 12px;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 14px 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 0;
+    }
+    .title {
+      font-size: 18px; font-weight: 700; letter-spacing: 0.3px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .big {
+      font-size: 44px; font-weight: 800; line-height: 1.1; margin: 2px 0 10px;
+    }
+    .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+    .kpi { flex: 1; min-width: 120px; }
+    .kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px;}
+    .kpi .val { font-size: 28px; font-weight: 700;}
+    .progress {
+      width: 100%; height: 10px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress > div { height: 100%; background: var(--accent); width: 0%; transition: width 0.4s ease; }
+    .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .weather-item { text-align: center; }
+    .feed {
+      overflow-y: auto; scrollbar-width: thin; padding-right: 4px;
+    }
+    .feed-item { padding: 8px 0; border-bottom: 1px dashed rgba(255,255,255,0.07); }
+    .feed-item a { color: var(--fg); text-decoration: none; }
+    .feed-item a:hover { text-decoration: underline; }
+    .time { font-size: 32px; font-weight: 700; letter-spacing: 1px; }
+    .sub { color: var(--muted); font-size: 14px; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:rgba(255,255,255,0.08); font-size:12px; }
+    .grid > .wide { grid-column: 1 / -1; }
+
+    /* Views */
+    .view { display: none; height: 100%; position: relative; }
+    .view.active { display: block; }
+
+    /* Specialized full views using the same grid */
+    body.view-weather .grid .card { display: none; }
+    body.view-weather #weatherCard { display: flex; grid-column: 1 / -1; grid-row: 1 / -1; min-height: calc(100% - 24px); }
+    body.view-weather .grid { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+
+    body.view-system .grid .card { display: none; }
+    body.view-system #systemCard { display: flex; grid-column: 1 / -1; grid-row: 1 / -1; min-height: calc(100% - 24px); }
+    body.view-system .grid { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+
+    /* Browser/chatgpt view containers */
+    .webview-wrap { position: absolute; inset: 0; padding: 12px; box-sizing: border-box; }
+    .webview-chrome { display:flex; gap:6px; align-items:center; margin-bottom:8px; }
+    .webview-chrome input { flex:1; height:36px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); padding:0 10px; background: var(--card); color: var(--fg); }
+    .webview-chrome .small-btn { height:36px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background: var(--card); color: var(--fg); padding:0 10px; cursor:pointer; }
+    .webview-host { position: absolute; left: 12px; right: 12px; top: 60px; bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); z-index: 1; }
+    .webview-host webview { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 1; }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="top" id="sidebarTop"></div>
+    <div class="spacer"></div>
+    <div class="bottom" id="sidebarBottom"></div>
+  </div>
+  <div class="app">
+  <div class="view active" id="view-dashboard">
+  <div class="grid">
+    <div class="card wide" id="clockCard">
+      <div class="row" style="justify-content: space-between; align-items: end;">
+        <div>
+          <div class="title">Now</div>
+          <div class="time" id="clock">--:--</div>
+          <div class="sub" id="date">—</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="pill" id="locationPill">Loc: —</div>
+          <div class="sub">Mini Touch Dashboard</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="weatherCard">
+      <div class="title">Weather</div>
+      <div class="big" id="currentTemp">—</div>
+      <div class="sub" id="weatherSummary">—</div>
+      <div class="weather-grid" id="weatherGrid"></div>
+    </div>
+
+    <div class="card" id="systemCard">
+      <div class="title">System</div>
+      <div class="row">
+        <div class="kpi">
+          <div class="label">CPU</div>
+          <div class="val" id="cpuLoad">—%</div>
+          <div class="progress"><div id="cpuBar"></div></div>
+        </div>
+        <div class="kpi">
+          <div class="label">CPU Temp</div>
+          <div class="val" id="cpuTemp">—°</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Memory</div>
+          <div class="val" id="memUsed">—</div>
+          <div class="progress"><div id="memBar"></div></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div class="kpi">
+          <div class="label">Net Down</div>
+          <div class="val" id="netDown">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Net Up</div>
+          <div class="val" id="netUp">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="feedCard">
+      <div class="title">Feed</div>
+      <div class="feed" id="feedList"></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="view" id="view-browser">
+    <div class="webview-wrap">
+      <div class="webview-chrome">
+        <button class="small-btn" id="navBack">←</button>
+        <button class="small-btn" id="navFwd">→</button>
+        <input id="urlInput" type="text" placeholder="Enter URL (e.g. https://example.com)" />
+        <button class="small-btn" id="goBtn">Go</button>
+        <button class="small-btn" data-quick="https://google.com">Google</button>
+        <button class="small-btn" data-quick="https://youtube.com">YouTube</button>
+      </div>
+      <div class="webview-host card">
+        <webview id="browserView" src="https://google.com" allowpopups></webview>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-chatgpt">
+    <div class="webview-wrap">
+      <div class="webview-chrome">
+        <div class="pill">ChatGPT</div>
+        <button class="small-btn" id="chatgptReload">Reload</button>
+        <button class="small-btn" id="chatgptOpenExternal">Open in Browser</button>
+      </div>
+      <div class="webview-host card">
+        <webview id="chatgptView" src="https://chatgpt.com" allowpopups></webview>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-settings">
+    <div class="webview-wrap">
+      <div class="webview-chrome">
+        <div class="pill">Settings</div>
+        <button class="small-btn" id="settingsAdd">Add App</button>
+        <button class="small-btn" id="settingsSave">Save</button>
+        <button class="small-btn" id="settingsRevert">Revert</button>
+      </div>
+      <div class="card" style="position:absolute; left:12px; right:12px; top:60px; bottom:12px; overflow:auto;">
+        <div class="sub" style="margin-bottom:8px;">Configure sidebar apps. Tap to edit.</div>
+        <div id="settingsList"></div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <script>
+    const si = require('systeminformation');
+    const path = require('path');
+    const fs = require('fs');
+    const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+
+    const UNIT = config.temperatureUnit === 'fahrenheit' ? '°F' : '°C';
+
+    function formatBytes(bytes) {
+      const units = ['B','KB','MB','GB','TB'];
+      let i = 0; let val = bytes;
+      while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
+      return val.toFixed(1) + ' ' + units[i];
+    }
+    function formatBitsPerSec(bps) {
+      const units = ['bps','Kbps','Mbps','Gbps'];
+      let i = 0; let val = bps;
+      while (val >= 1000 && i < units.length - 1) { val /= 1000; i++; }
+      return val.toFixed(1) + ' ' + units[i];
+    }
+
+    // Clock
+    function tickClock() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mm = String(now.getMinutes()).padStart(2,'0');
+      document.getElementById('clock').textContent = `${hh}:${mm}`;
+      document.getElementById('date').textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+    }
+    setInterval(tickClock, 1000); tickClock();
+
+    // Weather (Open-Meteo, no API key)
+    async function loadWeather() {
+      const lat = config.latitude, lon = config.longitude;
+      const tempUnit = config.temperatureUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius';
+      const windUnit = config.windSpeedUnit === 'mph' ? 'mph' : 'kmh';
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&hourly=temperature_2m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
+      document.getElementById('locationPill').textContent = `Loc: ${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const cur = data.current;
+        document.getElementById('currentTemp').textContent = Math.round(cur.temperature_2m) + (tempUnit === 'fahrenheit' ? '°F' : '°C');
+        document.getElementById('weatherSummary').textContent = `Wind ${Math.round(cur.wind_speed_10m)} ${windUnit.toUpperCase()}`;
+
+        // Next 8 hours temps
+        const idxNow = data.hourly.time.findIndex(t => new Date(t).getTime() >= Date.now());
+        const grid = document.getElementById('weatherGrid');
+        grid.innerHTML = '';
+        for (let i = 0; i < 8; i++) {
+          const idx = idxNow + i;
+          if (idx >= data.hourly.time.length) break;
+          const t = new Date(data.hourly.time[idx]);
+          const temp = Math.round(data.hourly.temperature_2m[idx]);
+          const el = document.createElement('div');
+          el.className = 'weather-item';
+          el.innerHTML = `<div class="sub">${t.getHours()}:00</div><div class="big" style="font-size:28px">${temp}°</div>`;
+          grid.appendChild(el);
+        }
+      } catch (e) {
+        document.getElementById('weatherSummary').textContent = 'Weather unavailable';
+      }
+    }
+    loadWeather();
+    setInterval(loadWeather, config.refresh.weatherMs || 10*60*1000);
+
+    // System metrics
+    let lastRx = 0, lastTx = 0, lastTime = 0;
+    async function sampleMetrics() {
+      try {
+        const [load, mem, temp, net] = await Promise.all([
+          si.currentLoad(),
+          si.mem(),
+          si.cpuTemperature(),
+          si.networkStats()
+        ]);
+
+        const cpu = Math.round(load.currentload);
+        document.getElementById('cpuLoad').textContent = cpu + '%';
+        document.getElementById('cpuBar').style.width = Math.min(cpu,100) + '%';
+
+        const t = temp.main && temp.main > 0 ? Math.round(temp.main) : '—';
+        document.getElementById('cpuTemp').textContent = t + (t==='—' ? '' : UNIT);
+
+        const used = mem.active || (mem.total - mem.available);
+        const memPct = Math.round((used / mem.total) * 100);
+        document.getElementById('memUsed').textContent = `${(used/ (1024**3)).toFixed(1)} / ${(mem.total/(1024**3)).toFixed(1)} GB`;
+        document.getElementById('memBar').style.width = Math.min(memPct,100) + '%';
+
+        // Aggregate network across all interfaces
+        const rx = net.reduce((a,n)=>a+n.rx_bytes,0);
+        const tx = net.reduce((a,n)=>a+n.tx_bytes,0);
+        const now = Date.now();
+        if (lastTime) {
+          const dt = (now - lastTime) / 1000;
+          const downBps = (rx - lastRx) * 8 / dt;
+          const upBps = (tx - lastTx) * 8 / dt;
+          document.getElementById('netDown').textContent = formatBitsPerSec(Math.max(0, downBps));
+          document.getElementById('netUp').textContent = formatBitsPerSec(Math.max(0, upBps));
+        }
+        lastRx = rx; lastTx = tx; lastTime = now;
+      } catch (e) {
+        // no-op
+      }
+    }
+    setInterval(sampleMetrics, config.refresh.metricsMs || 1500);
+    sampleMetrics();
+
+    // RSS feed (simple fetch + xml2js in renderer)
+    const { parseStringPromise } = require('xml2js');
+    async function loadFeeds() {
+      const list = document.getElementById('feedList');
+      list.innerHTML = '';
+      for (const feedUrl of config.rssFeeds || []) {
+        try {
+          const res = await fetch(feedUrl);
+          const xml = await res.text();
+          const parsed = await parseStringPromise(xml, { explicitArray: false });
+          const items = (parsed.rss && parsed.rss.channel && parsed.rss.channel.item)
+            ? parsed.rss.channel.item
+            : (parsed.feed && parsed.feed.entry) ? parsed.feed.entry : [];
+          const arr = Array.isArray(items) ? items.slice(0, 5) : [items];
+          arr.filter(Boolean).forEach(item => {
+            const title = item.title && (item.title._ || item.title) || 'Untitled';
+            const link = item.link && (item.link.href || item.link[0] || item.link) || '#';
+            const div = document.createElement('div');
+            div.className = 'feed-item';
+            div.innerHTML = `<a href="${link}" onclick="require('electron').shell.openExternal('${link}'); return false;">${title}</a>`;
+            list.appendChild(div);
+          });
+        } catch (e) {
+          const div = document.createElement('div');
+          div.className = 'feed-item';
+          div.textContent = `Failed to load: ${feedUrl}`;
+          list.appendChild(div);
+        }
+      }
+    }
+    loadFeeds();
+    setInterval(loadFeeds, config.refresh.rssMs || 10*60*1000);
+
+    // Sidebar navigation + configuration
+    const body = document.body;
+    const views = {
+      dashboard: document.getElementById('view-dashboard'),
+      browser: document.getElementById('view-browser'),
+      chatgpt: document.getElementById('view-chatgpt'),
+      settings: document.getElementById('view-settings')
+    };
+    function showView(name) {
+      body.classList.remove('view-weather','view-system','view-browser','view-chatgpt','view-dashboard');
+      Object.values(views).forEach(v => v && v.classList.remove('active'));
+      if (name === 'weather') {
+        body.classList.add('view-weather');
+        views.dashboard.classList.add('active');
+      } else if (name === 'system') {
+        body.classList.add('view-system');
+        views.dashboard.classList.add('active');
+      } else if (name === 'browser') {
+        body.classList.add('view-browser');
+        views.browser.classList.add('active');
+      } else if (name === 'chatgpt') {
+        body.classList.add('view-chatgpt');
+        views.chatgpt.classList.add('active');
+      } else if (name === 'settings') {
+        views.settings.classList.add('active');
+      } else {
+        body.classList.add('view-dashboard');
+        views.dashboard.classList.add('active');
+      }
+    }
+
+    function defaultApps() {
+      return [
+        { id: 'dashboard', type: 'dashboard', label: 'Home', icon: '🏠' },
+        { id: 'browser', type: 'browser', label: 'Browser', icon: '🌐', url: 'https://google.com' },
+        { id: 'chatgpt', type: 'chatgpt', label: 'ChatGPT', icon: '🤖', url: 'https://chatgpt.com' },
+        { id: 'weather', type: 'weather', label: 'Weather', icon: '⛅' },
+        { id: 'system', type: 'system', label: 'System', icon: '🖥️' }
+      ];
+    }
+
+    function ensureApps(cfg) {
+      if (!cfg.apps || !Array.isArray(cfg.apps) || cfg.apps.length === 0) {
+        cfg.apps = defaultApps();
+      }
+      const perPage = (cfg.sidebar && cfg.sidebar.itemsPerPage) || 5;
+      (cfg.apps || []).forEach((app, i) => {
+        if (!Number.isInteger(app.page) || app.page < 0) {
+          app.page = Math.floor(i / perPage);
+        }
+      });
+    }
+    ensureApps(config);
+
+    // Sidebar paging
+    let sidebarPage = 0;
+    let itemsPerPage = (config.sidebar && config.sidebar.itemsPerPage) || 5;
+    function totalPages() {
+      const apps = config.apps || [];
+      if (apps.length === 0) return 1;
+      const maxPage = apps.reduce((m, a) => Math.max(m, Number.isInteger(a.page) ? a.page : 0), 0);
+      return Math.max(1, maxPage + 1);
+    }
+    function clampPage() { const t = totalPages(); if (sidebarPage >= t) sidebarPage = t - 1; if (sidebarPage < 0) sidebarPage = 0; }
+
+    function rebuildSidebar() {
+      const top = document.getElementById('sidebarTop');
+      const bottom = document.getElementById('sidebarBottom');
+      top.innerHTML = '';
+      bottom.innerHTML = '';
+
+      clampPage();
+      const subset = (config.apps || []).filter(app => (app.page || 0) === sidebarPage);
+      subset.slice(0, itemsPerPage).forEach((app) => {
+        const idx = (config.apps || []).indexOf(app);
+        const item = document.createElement('div');
+        item.className = 's-item';
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.textContent = app.icon || '❖';
+        btn.dataset.idx = String(idx);
+        btn.title = app.label || app.type;
+        const label = document.createElement('div');
+        label.className = 's-label';
+        label.textContent = app.label || app.type;
+        item.appendChild(btn);
+        item.appendChild(label);
+        top.appendChild(item);
+      });
+
+      // Paging controls + Settings fixed at bottom
+      const pager = document.createElement('div');
+      pager.className = 's-item';
+      const row = document.createElement('div');
+      row.className = 's-row';
+      const upBtn = document.createElement('div');
+      upBtn.className = 'btn sm' + (sidebarPage === 0 ? ' disabled' : '');
+      upBtn.textContent = '▲'; upBtn.title = 'Prev'; upBtn.dataset.nav = 'up';
+      const isLast = sidebarPage >= totalPages()-1;
+      const downBtn = document.createElement('div');
+      downBtn.className = 'btn sm' + (isLast ? ' disabled' : '');
+      downBtn.textContent = '▼'; downBtn.title = 'Next'; downBtn.dataset.nav = 'down';
+      row.appendChild(upBtn); row.appendChild(downBtn);
+      pager.appendChild(row);
+      pager.appendChild(Object.assign(document.createElement('div'), { className:'s-label', textContent:`${sidebarPage+1}/${totalPages()}` }));
+      bottom.appendChild(pager);
+
+      const settingsItem = document.createElement('div');
+      settingsItem.className = 's-item';
+      const sbtn = document.createElement('div');
+      sbtn.className = 'btn'; sbtn.textContent = '⚙️'; sbtn.title = 'Settings'; sbtn.dataset.settings = '1';
+      const slabel = document.createElement('div'); slabel.className = 's-label'; slabel.textContent = 'Settings';
+      settingsItem.appendChild(sbtn); settingsItem.appendChild(slabel);
+      bottom.appendChild(settingsItem);
+    }
+
+    function handleSidebarClick(e) {
+      const navBtn = e.target.closest('.btn[data-nav]');
+      if (navBtn) {
+        const dir = navBtn.dataset.nav;
+        if (dir === 'up' && sidebarPage > 0) { sidebarPage--; rebuildSidebar(); }
+        if (dir === 'down' && sidebarPage < totalPages()-1) { sidebarPage++; rebuildSidebar(); }
+        return;
+      }
+      const settingsBtn = e.target.closest('.btn[data-settings="1"]');
+      if (settingsBtn) { showView('settings'); renderSettings(); return; }
+      const btn = e.target.closest('.btn[data-idx]');
+      if (!btn) return;
+      const idx = Number(btn.dataset.idx);
+      const appItem = config.apps[idx];
+      if (!appItem) return;
+      if (appItem.type === 'dashboard') {
+        showView('dashboard');
+      } else if (appItem.type === 'weather') {
+        showView('weather');
+      } else if (appItem.type === 'system') {
+        showView('system');
+      } else if (appItem.type === 'browser') {
+        if (appItem.url && !hasNavigated.browser) { urlInput.value = appItem.url; browserView.loadURL(appItem.url); }
+        showView('browser');
+      } else if (appItem.type === 'chatgpt') {
+        // Dedicated chatgpt view
+        if (appItem.url && !hasNavigated.chatgpt) { try { chatgptView.loadURL(appItem.url); } catch(_){} }
+        showView('chatgpt');
+      } else if (appItem.type === 'web') {
+        const target = appItem.url || 'https://example.com';
+        urlInput.value = target;
+        browserView.loadURL(target);
+        showView('browser');
+      } else {
+        showView('dashboard');
+      }
+    }
+    document.getElementById('sidebar').addEventListener('click', handleSidebarClick);
+
+    rebuildSidebar();
+    showView('dashboard');
+
+    // Browser controls
+    const browserView = document.getElementById('browserView');
+    const urlInput = document.getElementById('urlInput');
+    document.getElementById('goBtn').addEventListener('click', () => {
+      const raw = urlInput.value.trim();
+      if (!raw) return;
+      const hasProto = /^(https?:)?\/\//i.test(raw);
+      const url = hasProto ? raw : `https://${raw}`;
+      browserView.loadURL(url);
+    });
+    document.getElementById('navBack').addEventListener('click', () => { try { if (browserView.canGoBack()) browserView.goBack(); } catch(_){} });
+    document.getElementById('navFwd').addEventListener('click', () => { try { if (browserView.canGoForward()) browserView.goForward(); } catch(_){} });
+    document.querySelectorAll('[data-quick]')?.forEach(btn => btn.addEventListener('click', () => {
+      const url = btn.getAttribute('data-quick');
+      urlInput.value = url;
+      browserView.loadURL(url);
+    }));
+    browserView.addEventListener('did-navigate', (e)=> { urlInput.value = e.url; });
+    browserView.addEventListener('did-navigate-in-page', (e)=> { urlInput.value = e.url; });
+
+    // ChatGPT controls
+    const chatgptView = document.getElementById('chatgptView');
+    document.getElementById('chatgptReload').addEventListener('click', () => chatgptView.reload());
+    document.getElementById('chatgptOpenExternal').addEventListener('click', () => {
+      require('electron').shell.openExternal(chatgptView.getURL());
+    });
+
+    // Persist last visited URLs so views resume where you left off
+    const webviewState = (() => {
+      try { return JSON.parse(localStorage.getItem('webviewState') || '{}'); } catch { return {}; }
+    })();
+    function saveWebviewState() {
+      try { localStorage.setItem('webviewState', JSON.stringify(webviewState)); } catch {}
+    }
+    const hasNavigated = { browser: false, chatgpt: false };
+    function setUrlInput(u) { try { urlInput.value = u; } catch {} }
+
+    // Restore previous locations if available
+    if (webviewState.browserURL) {
+      try { browserView.loadURL(webviewState.browserURL); setUrlInput(webviewState.browserURL); } catch {}
+    }
+    if (webviewState.chatgptURL) {
+      try { chatgptView.loadURL(webviewState.chatgptURL); } catch {}
+    }
+
+    // Track navigation to persist state
+    browserView.addEventListener('did-navigate', (e)=> {
+      hasNavigated.browser = true; webviewState.browserURL = e.url; saveWebviewState(); setUrlInput(e.url);
+    });
+    browserView.addEventListener('did-navigate-in-page', (e)=> {
+      hasNavigated.browser = true; webviewState.browserURL = e.url; saveWebviewState(); setUrlInput(e.url);
+    });
+    chatgptView.addEventListener('did-navigate', (e)=> {
+      hasNavigated.chatgpt = true; webviewState.chatgptURL = e.url; saveWebviewState();
+    });
+    chatgptView.addEventListener('did-navigate-in-page', (e)=> {
+      hasNavigated.chatgpt = true; webviewState.chatgptURL = e.url; saveWebviewState();
+    });
+    // Settings UI
+    const settingsList = document.getElementById('settingsList');
+    function renderSettings() {
+      settingsList.innerHTML = '';
+      const header = document.createElement('div');
+      header.className = 'row';
+      header.style.marginBottom = '8px';
+      header.innerHTML = '<div class="kpi"><div class="label">Icon</div></div><div class="kpi"><div class="label">Label</div></div><div class="kpi"><div class="label">Type</div></div><div class="kpi"><div class="label">URL (for web/browser)</div></div><div class="kpi"><div class="label">Page</div></div>';
+      settingsList.appendChild(header);
+      config.apps.forEach((app, idx) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.style.alignItems = 'center';
+        row.style.marginBottom = '8px';
+        row.innerHTML = `
+          <input style="width:60px; height:40px; font-size:22px; text-align:center;" value="${app.icon || ''}" data-field="icon" data-idx="${idx}">
+          <input style="flex:1; height:40px; font-size:16px;" value="${app.label || ''}" data-field="label" data-idx="${idx}">
+          <select style="height:40px; font-size:16px;" data-field="type" data-idx="${idx}">
+            <option value="dashboard" ${app.type==='dashboard'?'selected':''}>dashboard</option>
+            <option value="browser" ${app.type==='browser'?'selected':''}>browser</option>
+            <option value="chatgpt" ${app.type==='chatgpt'?'selected':''}>chatgpt</option>
+            <option value="weather" ${app.type==='weather'?'selected':''}>weather</option>
+            <option value="system" ${app.type==='system'?'selected':''}>system</option>
+            <option value="web" ${app.type==='web'?'selected':''}>web</option>
+          </select>
+          <input style="flex:1; height:40px; font-size:16px;" value="${app.url || ''}" placeholder="https://..." data-field="url" data-idx="${idx}">
+          <input style="width:70px; height:40px; font-size:16px; text-align:center;" value="${Number.isInteger(app.page)?app.page:0}" data-field="page" data-idx="${idx}" type="number" min="0">
+          <button class="small-btn" data-action="delete" data-idx="${idx}">Delete</button>
+        `;
+        settingsList.appendChild(row);
+      });
+    }
+    function collectSettingsFromUI() {
+      const newApps = [];
+      // Read rows in order
+      const rows = Array.from(settingsList.querySelectorAll('.row')).slice(1); // skip header
+      rows.forEach((row, i) => {
+        const icon = row.querySelector('input[data-field="icon"]').value.trim() || '❖';
+        const label = row.querySelector('input[data-field="label"]').value.trim() || 'App';
+        const type = row.querySelector('select[data-field="type"]').value;
+        const url = row.querySelector('input[data-field="url"]').value.trim();
+        newApps.push({ id: `${type}-${i}`, type, label, icon, ...(url ? { url } : {}) });
+      });
+      return newApps;
+    }
+    document.getElementById('settingsAdd').addEventListener('click', () => {
+      config.apps.push({ id: `web-${Date.now()}`, type: 'web', label: 'New', icon: '❖', url: 'https://example.com' });
+      renderSettings();
+    });
+    settingsList.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action="delete"]');
+      if (!btn) return;
+      const idx = Number(btn.dataset.idx);
+      config.apps.splice(idx, 1);
+      renderSettings();
+    });
+    document.getElementById('settingsRevert').addEventListener('click', () => {
+      // Reload from disk
+      try {
+        const fresh = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+        Object.assign(config, fresh);
+        ensureApps(config);
+        rebuildSidebar();
+        renderSettings();
+      } catch (e) {
+        alert('Failed to reload config.json');
+      }
+    });
+    document.getElementById('settingsSave').addEventListener('click', () => {
+      try {
+        config.apps = collectSettingsFromUI();
+        fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+        rebuildSidebar();
+        alert('Saved');
+      } catch (e) {
+        alert('Failed to save: ' + e.message);
+      }
+    });
+  </script>
+</body>
+</html>

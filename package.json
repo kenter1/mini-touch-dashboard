@@ -1,0 +1,19 @@
+{
+  "name": "mini-touch-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A small always-on-top Electron dashboard for a secondary touchscreen showing weather, system stats, and feeds.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electronmon ."
+  },
+  "dependencies": {
+    "systeminformation": "^5.23.7",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electronmon": "^2.0.3"
+  }
+}

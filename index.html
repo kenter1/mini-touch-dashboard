@@ -470,16 +470,21 @@
       } else if (appItem.type === 'system') {
         showView('system');
       } else if (appItem.type === 'browser') {
-        if (appItem.url && !hasNavigated.browser) { urlInput.value = appItem.url; browserView.loadURL(appItem.url); }
+        if (appItem.url && !hasNavigated.browser) {
+          const initial = /^(https?:)?\/\//i.test(appItem.url) ? appItem.url : `https://${appItem.url}`;
+          try { urlInput.value = initial; } catch {}
+          try { browserView.loadURL(initial); } catch {}
+        }
         showView('browser');
       } else if (appItem.type === 'chatgpt') {
         // Dedicated chatgpt view
         if (appItem.url && !hasNavigated.chatgpt) { try { chatgptView.loadURL(appItem.url); } catch(_){} }
         showView('chatgpt');
       } else if (appItem.type === 'web') {
-        const target = appItem.url || 'https://example.com';
-        urlInput.value = target;
-        browserView.loadURL(target);
+        const raw = appItem.url || 'https://example.com';
+        const target = /^(https?:)?\/\//i.test(raw) ? raw : `https://${raw}`;
+        try { urlInput.value = target; } catch {}
+        try { browserView.loadURL(target); } catch {}
         showView('browser');
       } else {
         showView('dashboard');
@@ -496,8 +501,7 @@
     document.getElementById('goBtn').addEventListener('click', () => {
       const raw = urlInput.value.trim();
       if (!raw) return;
-      const hasProto = /^(https?:)?\/\//i.test(raw);
-      const url = hasProto ? raw : `https://${raw}`;
+      const url = /^(https?:)?\/\//i.test(raw) ? raw : `https://${raw}`;
       browserView.loadURL(url);
     });
     document.getElementById('navBack').addEventListener('click', () => { try { if (browserView.canGoBack()) browserView.goBack(); } catch(_){} });

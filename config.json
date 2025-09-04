@@ -18,13 +18,15 @@
       "id": "dashboard-0",
       "type": "dashboard",
       "label": "Home",
-      "icon": "🏠"
+      "icon": "🏠",
+      "page": 0
     },
     {
       "id": "web-1",
       "type": "web",
       "label": "Music",
-      "icon": "🌐",
+      "icon": "🎵",
+      "page": 0,
       "url": "https://music.youtube.com/"
     },
     {
@@ -32,26 +34,33 @@
       "type": "chatgpt",
       "label": "ChatGPT",
       "icon": "🤖",
+      "page": 0,
       "url": "https://chatgpt.com"
     },
     {
       "id": "weather-3",
       "type": "weather",
       "label": "Weather",
-      "icon": "⛅"
+      "icon": "⛅",
+      "page": 0
     },
     {
       "id": "system-4",
       "type": "system",
       "label": "System",
-      "icon": "🖥️"
+      "icon": "🖥️",
+      "page": 1
     },
     {
       "id": "web-5",
       "type": "web",
       "label": "Ring",
       "icon": "❖",
+      "page": 1,
       "url": "https://ring.com/"
     }
-  ]
+  ],
+  "sidebar": {
+    "itemsPerPage": 5
+  }
 }

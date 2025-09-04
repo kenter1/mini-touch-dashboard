@@ -1,12 +1,18 @@
 <div class="webview-wrap">
-  <div class="webview-chrome">
-    <div class="pill">Settings</div>
-    <button class="small-btn" id="settingsAdd">Add App</button>
-    <button class="small-btn" id="settingsSave">Save</button>
+  <div class="webview-chrome" style="display:flex; align-items:center; gap:8px;">
+    <div class="pill" style="font-weight:700; letter-spacing:.3px;">Settings</div>
+    <div style="flex:1"></div>
+    <button class="small-btn" id="settingsAdd">+ App</button>
     <button class="small-btn" id="settingsRevert">Revert</button>
+    <button class="small-btn" id="settingsSave" style="background:var(--accent); color:#fff; border-color:transparent;">Save</button>
   </div>
-  <div class="card" style="position:absolute; left:12px; right:12px; top:60px; bottom:12px; overflow:auto;">
-    <div class="sub" style="margin-bottom:8px;">Configure sidebar apps. Tap to edit.</div>
-    <div id="settingsList"></div>
+  <div class="card" style="position:absolute; left:12px; right:12px; top:60px; bottom:12px; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:14px;">
+    <div class="sub" style="margin-bottom:4px;">Customize your dashboard, theme, and sidebar apps.</div>
+
+    <div id="generalSettings" class="card" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 12px; margin-bottom: 4px;">
+      <!-- Populated by settings.js -->
+    </div>
+
+    <div id="settingsList" style="display:flex; flex-direction:column; gap:12px; min-height: 0;"></div>
   </div>
 </div>

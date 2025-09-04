@@ -1,0 +1,57 @@
+<div class="grid">
+  <div class="card wide" id="clockCard">
+    <div class="row" style="justify-content: space-between; align-items: end;">
+      <div>
+        <div class="title">Now</div>
+        <div class="time" id="clock">--:--</div>
+        <div class="sub" id="date">-</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="pill" id="locationPill">Loc: -</div>
+        <div class="sub">Mini Touch Dashboard</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="weatherCard">
+    <div class="title">Weather</div>
+    <div class="big" id="currentTemp">-</div>
+    <div class="sub" id="weatherSummary">-</div>
+    <div class="weather-grid" id="weatherGrid"></div>
+  </div>
+
+  <div class="card" id="systemCard">
+    <div class="title">System</div>
+    <div class="row">
+      <div class="kpi">
+        <div class="label">CPU</div>
+        <div class="val" id="cpuLoad">-%</div>
+        <div class="progress"><div id="cpuBar"></div></div>
+      </div>
+      <div class="kpi">
+        <div class="label">CPU Temp</div>
+        <div class="val" id="cpuTemp">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Memory</div>
+        <div class="val" id="memUsed">-</div>
+        <div class="progress"><div id="memBar"></div></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <div class="kpi">
+        <div class="label">Net Down</div>
+        <div class="val" id="netDown">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Net Up</div>
+        <div class="val" id="netUp">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="feedCard">
+    <div class="title">Feed</div>
+    <div class="feed" id="feedList"></div>
+  </div>
+</div>

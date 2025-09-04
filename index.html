@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8" />
@@ -57,8 +57,8 @@
 
     /* Use left/right arrows for pager buttons */
     .sidebar .btn.sm[data-nav] { font-size: 0; }
-    .sidebar .btn.sm[data-nav="up"]::before { content: '←'; font-size: 18px; }
-    .sidebar .btn.sm[data-nav="down"]::before { content: '→'; font-size: 18px; }
+    .sidebar .btn.sm[data-nav="up"]::before { content: 'â†'; font-size: 18px; }
+    .sidebar .btn.sm[data-nav="down"]::before { content: 'â†’'; font-size: 18px; }
 
     .grid {
       display: grid;
@@ -137,71 +137,14 @@
     <div class="bottom" id="sidebarBottom"></div>
   </div>
   <div class="app">
-  <div class="view active" id="view-dashboard">
-  <div class="grid">
-    <div class="card wide" id="clockCard">
-      <div class="row" style="justify-content: space-between; align-items: end;">
-        <div>
-          <div class="title">Now</div>
-          <div class="time" id="clock">--:--</div>
-          <div class="sub" id="date">—</div>
-        </div>
-        <div style="text-align:right;">
-          <div class="pill" id="locationPill">Loc: —</div>
-          <div class="sub">Mini Touch Dashboard</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" id="weatherCard">
-      <div class="title">Weather</div>
-      <div class="big" id="currentTemp">—</div>
-      <div class="sub" id="weatherSummary">—</div>
-      <div class="weather-grid" id="weatherGrid"></div>
-    </div>
-
-    <div class="card" id="systemCard">
-      <div class="title">System</div>
-      <div class="row">
-        <div class="kpi">
-          <div class="label">CPU</div>
-          <div class="val" id="cpuLoad">—%</div>
-          <div class="progress"><div id="cpuBar"></div></div>
-        </div>
-        <div class="kpi">
-          <div class="label">CPU Temp</div>
-          <div class="val" id="cpuTemp">—°</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Memory</div>
-          <div class="val" id="memUsed">—</div>
-          <div class="progress"><div id="memBar"></div></div>
-        </div>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <div class="kpi">
-          <div class="label">Net Down</div>
-          <div class="val" id="netDown">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Net Up</div>
-          <div class="val" id="netUp">—</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" id="feedCard">
-      <div class="title">Feed</div>
-      <div class="feed" id="feedList"></div>
-    </div>
-  </div>
-  </div>
+  <div class="view active" id="view-dynamic"></div>
+  <div class="view" id="view-dashboard"></div>
 
   <div class="view" id="view-browser">
     <div class="webview-wrap">
       <div class="webview-chrome">
-        <button class="small-btn" id="navBack">←</button>
-        <button class="small-btn" id="navFwd">→</button>
+        <button class="small-btn" id="navBack">â†</button>
+        <button class="small-btn" id="navFwd">â†’</button>
         <input id="urlInput" type="text" placeholder="Enter URL (e.g. https://example.com)" />
         <button class="small-btn" id="goBtn">Go</button>
         <button class="small-btn" data-quick="https://google.com">Google</button>
@@ -226,20 +169,7 @@
     </div>
   </div>
 
-  <div class="view" id="view-settings">
-    <div class="webview-wrap">
-      <div class="webview-chrome">
-        <div class="pill">Settings</div>
-        <button class="small-btn" id="settingsAdd">Add App</button>
-        <button class="small-btn" id="settingsSave">Save</button>
-        <button class="small-btn" id="settingsRevert">Revert</button>
-      </div>
-      <div class="card" style="position:absolute; left:12px; right:12px; top:60px; bottom:12px; overflow:auto;">
-        <div class="sub" style="margin-bottom:8px;">Configure sidebar apps. Tap to edit.</div>
-        <div id="settingsList"></div>
-      </div>
-    </div>
-  </div>
+  <!-- Settings view loads dynamically into #view-dynamic -->
 
   </div>
 
@@ -247,9 +177,14 @@
     const si = require('systeminformation');
     const path = require('path');
     const fs = require('fs');
+    // Safe DOM helpers (views are loaded dynamically)
+    const $ = (id) => document.getElementById(id);
+    function setText(id, text) { const el = $(id); if (el) el.textContent = text; }
+    function setHTML(id, html) { const el = $(id); if (el) el.innerHTML = html; }
+    function setWidth(id, val) { const el = $(id); if (el) el.style.width = val; }
     const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 
-    const UNIT = config.temperatureUnit === 'fahrenheit' ? '°F' : '°C';
+    const UNIT = config.temperatureUnit === 'fahrenheit' ? 'Â°F' : 'Â°C';
 
     function formatBytes(bytes) {
       const units = ['B','KB','MB','GB','TB'];
@@ -269,10 +204,10 @@
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,'0');
       const mm = String(now.getMinutes()).padStart(2,'0');
-      document.getElementById('clock').textContent = `${hh}:${mm}`;
-      document.getElementById('date').textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+      setText('clock', `${hh}:${mm}`);
+      setText('date', now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' }));
     }
-    setInterval(tickClock, 1000); tickClock();
+    // Initialized after first view is loaded
 
     // Weather (Open-Meteo, no API key)
     async function loadWeather() {
@@ -280,12 +215,12 @@
       const tempUnit = config.temperatureUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius';
       const windUnit = config.windSpeedUnit === 'mph' ? 'mph' : 'kmh';
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&hourly=temperature_2m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
-      document.getElementById('locationPill').textContent = `Loc: ${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+      setText('locationPill', `Loc: ${lat.toFixed(3)}, ${lon.toFixed(3)}`);
       try {
         const res = await fetch(url);
         const data = await res.json();
         const cur = data.current;
-        document.getElementById('currentTemp').textContent = Math.round(cur.temperature_2m) + (tempUnit === 'fahrenheit' ? '°F' : '°C');
+        document.getElementById('currentTemp').textContent = Math.round(cur.temperature_2m) + (tempUnit === 'fahrenheit' ? 'Â°F' : 'Â°C');
         document.getElementById('weatherSummary').textContent = `Wind ${Math.round(cur.wind_speed_10m)} ${windUnit.toUpperCase()}`;
 
         // Next 8 hours temps
@@ -299,15 +234,14 @@
           const temp = Math.round(data.hourly.temperature_2m[idx]);
           const el = document.createElement('div');
           el.className = 'weather-item';
-          el.innerHTML = `<div class="sub">${t.getHours()}:00</div><div class="big" style="font-size:28px">${temp}°</div>`;
+          el.innerHTML = `<div class="sub">${t.getHours()}:00</div><div class="big" style="font-size:28px">${temp}Â°</div>`;
           grid.appendChild(el);
         }
       } catch (e) {
         document.getElementById('weatherSummary').textContent = 'Weather unavailable';
       }
     }
-    loadWeather();
-    setInterval(loadWeather, config.refresh.weatherMs || 10*60*1000);
+    // Initialized after first view is loaded
 
     // System metrics
     let lastRx = 0, lastTx = 0, lastTime = 0;
@@ -324,8 +258,8 @@
         document.getElementById('cpuLoad').textContent = cpu + '%';
         document.getElementById('cpuBar').style.width = Math.min(cpu,100) + '%';
 
-        const t = temp.main && temp.main > 0 ? Math.round(temp.main) : '—';
-        document.getElementById('cpuTemp').textContent = t + (t==='—' ? '' : UNIT);
+        const t = temp.main && temp.main > 0 ? Math.round(temp.main) : 'â€”';
+        document.getElementById('cpuTemp').textContent = t + (t==='â€”' ? '' : UNIT);
 
         const used = mem.active || (mem.total - mem.available);
         const memPct = Math.round((used / mem.total) * 100);
@@ -348,8 +282,7 @@
         // no-op
       }
     }
-    setInterval(sampleMetrics, config.refresh.metricsMs || 1500);
-    sampleMetrics();
+    // Initialized after first view is loaded
 
     // RSS feed (simple fetch + xml2js in renderer)
     const { parseStringPromise } = require('xml2js');
@@ -381,47 +314,63 @@
         }
       }
     }
-    loadFeeds();
-    setInterval(loadFeeds, config.refresh.rssMs || 10*60*1000);
+    // Initialized after first view is loaded
 
     // Sidebar navigation + configuration
     const body = document.body;
     const views = {
+      dynamic: document.getElementById('view-dynamic'),
       dashboard: document.getElementById('view-dashboard'),
       browser: document.getElementById('view-browser'),
-      chatgpt: document.getElementById('view-chatgpt'),
-      settings: document.getElementById('view-settings')
+      chatgpt: document.getElementById('view-chatgpt')
     };
-    function showView(name) {
-      body.classList.remove('view-weather','view-system','view-browser','view-chatgpt','view-dashboard');
-      Object.values(views).forEach(v => v && v.classList.remove('active'));
-      if (name === 'weather') {
-        body.classList.add('view-weather');
-        views.dashboard.classList.add('active');
-      } else if (name === 'system') {
-        body.classList.add('view-system');
-        views.dashboard.classList.add('active');
-      } else if (name === 'browser') {
-        body.classList.add('view-browser');
-        views.browser.classList.add('active');
-      } else if (name === 'chatgpt') {
-        body.classList.add('view-chatgpt');
-        views.chatgpt.classList.add('active');
-      } else if (name === 'settings') {
-        views.settings.classList.add('active');
-      } else {
-        body.classList.add('view-dashboard');
-        views.dashboard.classList.add('active');
+    function loadPartial(file) {
+      try {
+        const html = fs.readFileSync(path.join(__dirname, 'views', file), 'utf8');
+        views.dynamic.innerHTML = html;
+      } catch (e) {
+        views.dynamic.innerHTML = `<div class=\"card\" style=\"margin:12px;\">Failed to load view: ${file}</div>`;
       }
+    }
+    let currentViewModule = null;
+    function showView(name) {
+      // Tear down previous dynamic view module if any
+      try { currentViewModule?.destroy?.(); } catch {}
+      currentViewModule = null;
+      // Hide all
+      views.dynamic.classList.remove('active');
+      views.dashboard.classList.remove('active');
+      views.browser.classList.remove('active');
+      views.chatgpt.classList.remove('active');
+      if (name === 'browser') {
+        views.browser.classList.add('active');
+        return;
+      }
+      if (name === 'chatgpt') {
+        views.chatgpt.classList.add('active');
+        return;
+      }
+      // Dynamic HTML fragments
+      const file = `${name}.html`;
+      loadPartial(file);
+      views.dynamic.classList.add('active');
+      // Load corresponding JS module if present
+      try {
+        const modPath = path.join(__dirname, 'views', `${name}.js`);
+        delete require.cache[require.resolve(modPath)];
+        const mod = require(modPath);
+        currentViewModule = mod;
+        mod.init({ config, ensureApps, rebuildSidebar });
+      } catch (_) { /* view may not have a module */ }
     }
 
     function defaultApps() {
       return [
-        { id: 'dashboard', type: 'dashboard', label: 'Home', icon: '🏠' },
-        { id: 'browser', type: 'browser', label: 'Browser', icon: '🌐', url: 'https://google.com' },
-        { id: 'chatgpt', type: 'chatgpt', label: 'ChatGPT', icon: '🤖', url: 'https://chatgpt.com' },
-        { id: 'weather', type: 'weather', label: 'Weather', icon: '⛅' },
-        { id: 'system', type: 'system', label: 'System', icon: '🖥️' }
+        { id: 'dashboard', type: 'dashboard', label: 'Home', icon: 'ðŸ ' },
+        { id: 'browser', type: 'browser', label: 'Browser', icon: 'ðŸŒ', url: 'https://google.com' },
+        { id: 'chatgpt', type: 'chatgpt', label: 'ChatGPT', icon: 'ðŸ¤–', url: 'https://chatgpt.com' },
+        { id: 'weather', type: 'weather', label: 'Weather', icon: 'â›…' },
+        { id: 'system', type: 'system', label: 'System', icon: 'ðŸ–¥ï¸' }
       ];
     }
 
@@ -463,7 +412,7 @@
         item.className = 's-item';
         const btn = document.createElement('div');
         btn.className = 'btn';
-        btn.textContent = app.icon || '❖';
+        btn.textContent = app.icon || 'â–';
         btn.dataset.idx = String(idx);
         btn.title = app.label || app.type;
         const label = document.createElement('div');
@@ -481,11 +430,11 @@
       row.className = 's-row';
       const upBtn = document.createElement('div');
       upBtn.className = 'btn sm' + (sidebarPage === 0 ? ' disabled' : '');
-      upBtn.textContent = '▲'; upBtn.title = 'Prev'; upBtn.dataset.nav = 'up';
+      upBtn.textContent = 'â–²'; upBtn.title = 'Prev'; upBtn.dataset.nav = 'up';
       const isLast = sidebarPage >= totalPages()-1;
       const downBtn = document.createElement('div');
       downBtn.className = 'btn sm' + (isLast ? ' disabled' : '');
-      downBtn.textContent = '▼'; downBtn.title = 'Next'; downBtn.dataset.nav = 'down';
+      downBtn.textContent = 'â–¼'; downBtn.title = 'Next'; downBtn.dataset.nav = 'down';
       row.appendChild(upBtn); row.appendChild(downBtn);
       pager.appendChild(row);
       pager.appendChild(Object.assign(document.createElement('div'), { className:'s-label', textContent:`${sidebarPage+1}/${totalPages()}` }));
@@ -494,7 +443,7 @@
       const settingsItem = document.createElement('div');
       settingsItem.className = 's-item';
       const sbtn = document.createElement('div');
-      sbtn.className = 'btn'; sbtn.textContent = '⚙️'; sbtn.title = 'Settings'; sbtn.dataset.settings = '1';
+      sbtn.className = 'btn'; sbtn.textContent = 'âš™ï¸'; sbtn.title = 'Settings'; sbtn.dataset.settings = '1';
       const slabel = document.createElement('div'); slabel.className = 's-label'; slabel.textContent = 'Settings';
       settingsItem.appendChild(sbtn); settingsItem.appendChild(slabel);
       bottom.appendChild(settingsItem);
@@ -509,7 +458,7 @@
         return;
       }
       const settingsBtn = e.target.closest('.btn[data-settings="1"]');
-      if (settingsBtn) { showView('settings'); renderSettings(); return; }
+      if (settingsBtn) { showView('settings'); return; }
       const btn = e.target.closest('.btn[data-idx]');
       if (!btn) return;
       const idx = Number(btn.dataset.idx);
@@ -600,8 +549,8 @@
     chatgptView.addEventListener('did-navigate-in-page', (e)=> {
       hasNavigated.chatgpt = true; webviewState.chatgptURL = e.url; saveWebviewState();
     });
-    // Settings UI
-    const settingsList = document.getElementById('settingsList');
+    // Settings UI (legacy block guarded; main logic moved to views/settings.js)
+    const settingsList = document.getElementById('settingsList'); if (settingsList) {
     function renderSettings() {
       settingsList.innerHTML = '';
       const header = document.createElement('div');
@@ -637,7 +586,7 @@
       // Read rows in order
       const rows = Array.from(settingsList.querySelectorAll('.row')).slice(1); // skip header
       rows.forEach((row, i) => {
-        const icon = row.querySelector('input[data-field="icon"]').value.trim() || '❖';
+        const icon = row.querySelector('input[data-field="icon"]').value.trim() || 'â–';
         const label = row.querySelector('input[data-field="label"]').value.trim() || 'App';
         const type = row.querySelector('select[data-field="type"]').value;
         const url = row.querySelector('input[data-field="url"]').value.trim();
@@ -646,7 +595,7 @@
       return newApps;
     }
     document.getElementById('settingsAdd').addEventListener('click', () => {
-      config.apps.push({ id: `web-${Date.now()}`, type: 'web', label: 'New', icon: '❖', url: 'https://example.com' });
+      config.apps.push({ id: `web-${Date.now()}`, type: 'web', label: 'New', icon: 'â–', url: 'https://example.com' });
       renderSettings();
     });
     settingsList.addEventListener('click', (e) => {
@@ -678,6 +627,8 @@
         alert('Failed to save: ' + e.message);
       }
     });
+    }
   </script>
 </body>
 </html>
+

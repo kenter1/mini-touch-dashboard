@@ -328,6 +328,17 @@ exports.init = function init(ctx) {
       const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4da3ff';
       drawSpark('cpuChart', cpuHist, accent);
       drawSpark('gpuChart', gpuHist, '#f39c12');
+      // Update NVIDIA GPU utilization in local branch
+      try {
+        const gpu = await getNvidiaGpu();
+        if (gpu) {
+          const util = Math.round(gpu.util);
+          const el = document.getElementById('gpuLoad');
+          const bar = document.getElementById('gpuBar');
+          if (el) el.textContent = util + '%';
+          if (bar) bar.style.width = Math.min(util, 100) + '%';
+        }
+      } catch {}
 
       // Top processes
       if (procs && procs.list) {

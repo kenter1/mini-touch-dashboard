@@ -4,7 +4,7 @@
 
 # Electron build outputs
 *.dmg
-*.exe
+!/extras/glances-web.exe
 *.AppImage
 *.snap
 *.asar

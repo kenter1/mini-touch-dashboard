@@ -2,7 +2,6 @@
 
 exports.init = function init(ctx) {
   const { config } = ctx;
-  const si = require('systeminformation');
   const { parseStringPromise } = require('xml2js');
 
   const UNIT = config.temperatureUnit === 'fahrenheit' ? '°F' : '°C';
@@ -67,43 +66,111 @@ exports.init = function init(ctx) {
   }
   loadWeather(); addTimer(setInterval(loadWeather, (config.refresh && config.refresh.weatherMs) || 10*60*1000));
 
-  // System metrics
-  let lastRx = 0, lastTx = 0, lastTime = 0;
+  // System metrics (Glances + optional NVIDIA via nvidia-smi)
+  const { execFile } = require('child_process');
+  function execFileSafe(cmd, args, options) {
+    return new Promise((resolve) => {
+      const child = execFile(cmd, args, { timeout: 1500, windowsHide: true, ...options }, (err, stdout) => {
+        if (err) return resolve(null);
+        resolve(String(stdout || ''));
+      });
+      child.on('error', () => resolve(null));
+    });
+  }
+  async function getNvidiaGpu() {
+    const args = ['--query-gpu=utilization.gpu,temperature.gpu', '--format=csv,noheader,nounits'];
+    let out = await execFileSafe('nvidia-smi', args);
+    if (!out && process.platform === 'win32') {
+      // Fallback to default Windows install path
+      out = await execFileSafe('C\\\x3a\\Program Files\\NVIDIA Corporation\\NVSMI\\nvidia-smi.exe', args);
+    }
+    if (!out) return null;
+    try {
+      const lines = out.trim().split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return null;
+      let maxUtil = 0; let maxTemp = 0;
+      for (const line of lines) {
+        const parts = line.split(/\s*,\s*/);
+        const util = Number(parts[0]) || 0;
+        const temp = Number(parts[1]) || 0;
+        if (util > maxUtil) maxUtil = util;
+        if (temp > maxTemp) maxTemp = temp;
+      }
+      return { util: Math.max(0, Math.min(100, maxUtil)), temp: maxTemp };
+    } catch { return null; }
+  }
   async function sampleMetrics() {
     try {
-      const [load, mem, temp, net] = await Promise.all([
-        si.currentLoad(), si.mem(), si.cpuTemperature(), si.networkStats()
-      ]);
-      const cpu = Math.round(load.currentload);
-      const cpuLoad = document.getElementById('cpuLoad');
-      const cpuBar = document.getElementById('cpuBar');
-      if (cpuLoad) cpuLoad.textContent = cpu + '%';
-      if (cpuBar) cpuBar.style.width = Math.min(cpu,100) + '%';
-      const t = temp.main && temp.main > 0 ? Math.round(temp.main) : '-';
-      const cpuTemp = document.getElementById('cpuTemp');
-      if (cpuTemp) cpuTemp.textContent = t + (t==='-' ? '' : UNIT);
-      const used = mem.active || (mem.total - mem.available);
-      const memPct = Math.round((used / mem.total) * 100);
-      const memUsed = document.getElementById('memUsed');
-      const memBar = document.getElementById('memBar');
-      if (memUsed) memUsed.textContent = `${(used/ (1024**3)).toFixed(1)} / ${(mem.total/(1024**3)).toFixed(1)} GB`;
-      if (memBar) memBar.style.width = Math.min(memPct,100) + '%';
-      const rx = net.reduce((a,n)=>a+n.rx_bytes,0);
-      const tx = net.reduce((a,n)=>a+n.tx_bytes,0);
-      const now = Date.now();
-      if (lastTime) {
-        const dt = (now - lastTime) / 1000;
-        const downBps = (rx - lastRx) * 8 / dt;
-        const upBps = (tx - lastTx) * 8 / dt;
-        const netDown = document.getElementById('netDown');
-        const netUp = document.getElementById('netUp');
-        if (netDown) netDown.textContent = formatBitsPerSec(Math.max(0, downBps));
-        if (netUp) netUp.textContent = formatBitsPerSec(Math.max(0, upBps));
+      const api = (config.metrics && config.metrics.api) || {};
+      let bases = [];
+      try {
+        const u = new URL(String(api.baseUrl || 'http://127.0.0.1:61208'));
+        const base = `${u.protocol}//${u.host}`.replace(/\/+$/,'');
+        bases.push(base);
+        if (/^localhost(?::|$)/i.test(u.host)) {
+          const port = u.port ? `:${u.port}` : '';
+          bases.push(`${u.protocol}//127.0.0.1${port}`);
+        }
+      } catch {
+        bases = [String(api.baseUrl || 'http://127.0.0.1:61208').replace(/\/+$/,'')];
       }
-      lastRx = rx; lastTx = tx; lastTime = now;
+      const paths = ['/api/4/all','/api/3/all'];
+      let data = null;
+      outer: for (const b of bases) {
+        for (const p of paths) {
+          try {
+            const res = await fetch(`${b}${p}`);
+            if (!res.ok) continue;
+            data = await res.json();
+            if (data) break outer;
+          } catch {}
+        }
+      }
+      if (!data) {
+        const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
+        const setW = (id,val)=>{ const el=document.getElementById(id); if(el) el.style.width=val; };
+        set('cpuLoad','-%'); setW('cpuBar','0%'); set('cpuTemp','-');
+        set('memUsed','-'); setW('memBar','0%'); set('netDown','-'); set('netUp','-');
+        return;
+      }
+      const cpu = Math.round(Number(data?.cpu?.total) || 0);
+      document.getElementById('cpuLoad').textContent = cpu + '%';
+      document.getElementById('cpuBar').style.width = Math.min(cpu,100) + '%';
+      const sensors = Array.isArray(data?.sensors) ? data.sensors : [];
+      const findSensor = (regexArr) => {
+        const s = sensors.find(s => regexArr.some(r => r.test(String(s.label||s.name||''))));
+        return Number(s && s.value) || 0;
+      };
+      let cpuTempC = findSensor([/cpu|package|tctl|tdie/i]);
+      const tDisp = cpuTempC>0 ? Math.round(UNIT.includes('F') ? (cpuTempC * 9/5 + 32) : cpuTempC) : '-';
+      document.getElementById('cpuTemp').textContent = tDisp + (tDisp==='-' ? '' : UNIT);
+      const memTotal = Number(data?.mem?.total) || 0;
+      const memUsedB = Number(data?.mem?.used) || 0;
+      const memPct = memTotal ? Math.round((memUsedB/memTotal)*100) : 0;
+      document.getElementById('memUsed').textContent = `${(memUsedB/(1024**3)).toFixed(1)} / ${(memTotal/(1024**3)).toFixed(1)} GB`;
+      document.getElementById('memBar').style.width = Math.min(memPct,100) + '%';
+      const netArr = Array.isArray(data?.network) ? data.network : [];
+      if (netArr.length) {
+        const rx = netArr.reduce((a,n)=>a + (Number(n.rx)||0), 0) * 8;
+        const tx = netArr.reduce((a,n)=>a + (Number(n.tx)||0), 0) * 8;
+        document.getElementById('netDown').textContent = formatBitsPerSec(Math.max(0, rx));
+        document.getElementById('netUp').textContent = formatBitsPerSec(Math.max(0, tx));
+      }
+
+      // Optional NVIDIA GPU utilization via nvidia-smi (does not use PowerShell/WMI)
+      try {
+        const gpu = await getNvidiaGpu();
+        if (gpu) {
+          const util = Math.round(gpu.util);
+          const el = document.getElementById('gpuLoad');
+          const bar = document.getElementById('gpuBar');
+          if (el) el.textContent = util + '%';
+          if (bar) bar.style.width = Math.min(util, 100) + '%';
+        }
+      } catch {}
     } catch {}
   }
-  sampleMetrics(); addTimer(setInterval(sampleMetrics, (config.refresh && config.refresh.metricsMs) || 1500));
+  sampleMetrics(); addTimer(setInterval(sampleMetrics, (config.refresh && config.refresh.metricsMsApi) || 2000));
 
   // RSS feed
   async function loadFeeds() {
@@ -143,4 +210,3 @@ exports.init = function init(ctx) {
     timers = [];
   };
 };
-

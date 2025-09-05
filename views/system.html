@@ -1,31 +1,64 @@
 <div class="grid">
   <div class="card" id="systemCard" style="grid-column: 1 / -1; grid-row: 1 / -1; min-height: calc(100% - 24px);">
     <div class="title">System</div>
-    <div class="row">
-      <div class="kpi">
-        <div class="label">CPU</div>
-        <div class="val" id="cpuLoad">-%</div>
-        <div class="progress"><div id="cpuBar"></div></div>
+  <div class="row">
+    <div class="kpi">
+      <div class="label">CPU</div>
+      <div class="val" id="cpuLoad">-%</div>
+      <div class="progress"><div id="cpuBar"></div></div>
+    </div>
+    <div class="kpi">
+      <div class="label">CPU Temp</div>
+      <div class="val" id="cpuTemp">-</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Memory</div>
+      <div class="val" id="memUsed">-</div>
+      <div class="progress"><div id="memBar"></div></div>
+    </div>
+    <div class="kpi">
+      <div class="label">GPU</div>
+      <div class="val" id="gpuLoad">-%</div>
+      <div class="progress"><div id="gpuBar"></div></div>
+    </div>
+    <div class="kpi">
+      <div class="label">GPU Temp</div>
+      <div class="val" id="gpuTemp">-</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Storage</div>
+      <div class="val" id="storageUsed">-</div>
+      <div class="progress"><div id="storageBar"></div></div>
+    </div>
+  </div>
+
+    <div class="row" style="margin-top:12px; gap:12px; align-items:stretch;">
+      <div class="card" style="flex:1; min-height:140px;">
+        <div class="label" style="margin-bottom:6px;">CPU History</div>
+        <canvas id="cpuChart" width="300" height="100" style="width:100%; height:100px;"></canvas>
       </div>
-      <div class="kpi">
-        <div class="label">CPU Temp</div>
-        <div class="val" id="cpuTemp">-</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Memory</div>
-        <div class="val" id="memUsed">-</div>
-        <div class="progress"><div id="memBar"></div></div>
+      <div class="card" style="flex:1; min-height:140px;">
+        <div class="label" style="margin-bottom:6px;">GPU History</div>
+        <canvas id="gpuChart" width="300" height="100" style="width:100%; height:100px;"></canvas>
       </div>
     </div>
-    <div class="row" style="margin-top:8px;">
-      <div class="kpi">
-        <div class="label">Net Down</div>
-        <div class="val" id="netDown">-</div>
+
+    <div class="row" style="margin-top:12px; align-items:flex-start; gap:12px; flex-wrap:nowrap;">
+      <div class="card" style="flex:1; min-width:0;">
+        <div class="label" style="margin-bottom:6px;">Top CPU Processes</div>
+        <div id="topCpuList" class="feed"></div>
       </div>
-      <div class="kpi">
-        <div class="label">Net Up</div>
-        <div class="val" id="netUp">-</div>
+      <div class="card" style="flex:1; min-width:0;">
+        <div class="label" style="margin-bottom:6px;">Storage (per drive)</div>
+        <div id="storageList" class="feed"></div>
       </div>
     </div>
+
+  <div class="row" style="margin-top:12px; align-items:flex-start; gap:12px; flex-wrap:nowrap;">
+    <div class="card" style="flex:1; min-width:0;">
+      <div class="label" style="margin-bottom:6px;">Top Memory Processes</div>
+      <div id="topMemList" class="feed"></div>
+    </div>
+  </div>
   </div>
 </div>

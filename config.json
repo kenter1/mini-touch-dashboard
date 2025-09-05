@@ -7,9 +7,20 @@
     "https://news.ycombinator.com/rss",
     "https://www.theverge.com/rss/index.xml"
   ],
+  "metrics": {
+    "mode": "api",
+    "api": {
+      "type": "glances",
+      "baseUrl": "http://127.0.0.1:61208",
+      "autoStart": true,
+      "refreshSec": 5,
+      "disablePlugins": []
+    }
+  },
   "theme": "auto",
   "refresh": {
     "metricsMs": 1500,
+    "metricsMsApi": 5000,
     "weatherMs": 600000,
     "rssMs": 600000
   },
@@ -22,7 +33,14 @@
       "page": 0
     },
     {
-      "id": "web-1",
+      "id": "system-1",
+      "type": "system",
+      "label": "System",
+      "icon": "🖥️",
+      "page": 0
+    },
+    {
+      "id": "web-2",
       "type": "web",
       "label": "Music",
       "icon": "🎵",
@@ -30,7 +48,7 @@
       "url": "https://music.youtube.com/"
     },
     {
-      "id": "chatgpt-2",
+      "id": "chatgpt-3",
       "type": "chatgpt",
       "label": "ChatGPT",
       "icon": "🤖",
@@ -38,18 +56,11 @@
       "url": "https://chatgpt.com"
     },
     {
-      "id": "weather-3",
+      "id": "weather-4",
       "type": "weather",
       "label": "Weather",
       "icon": "⛅",
       "page": 0
-    },
-    {
-      "id": "system-4",
-      "type": "system",
-      "label": "System",
-      "icon": "🖥️",
-      "page": 1
     },
     {
       "id": "web-5",

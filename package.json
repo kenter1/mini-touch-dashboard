@@ -6,7 +6,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electronmon ."
+    "dev": "electronmon .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win nsis",
+    "build:win:portable": "electron-builder --win portable",
+    "build:mac": "electron-builder --mac dmg",
+    "build:linux": "electron-builder --linux AppImage"
   },
   "dependencies": {
     "systeminformation": "^5.23.7",
@@ -14,6 +19,51 @@
   },
   "devDependencies": {
     "electron": "^38.0.0",
+    "electron-builder": "^26.0.12",
     "electronmon": "^2.0.3"
+  },
+  "build": {
+    "appId": "com.example.miniTouchDashboard",
+    "productName": "Mini Touch Dashboard",
+    "asar": true,
+    "files": [
+      "**/*",
+      "!node_modules/.cache/**",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "extras",
+        "to": "extras",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true,
+      "include": "build/installer.nsh"
+    },
+    "mac": {
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
   }
 }

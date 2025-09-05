@@ -173,7 +173,8 @@
   </div>
 
   <script>
-    const si = require('systeminformation');
+    // Disable local systeminformation polling to avoid PowerShell/WMI usage on Windows
+    const si = { currentLoad: async()=>({ currentload: 0 }), mem: async()=>({ total: 1, available: 1, active: 0 }), cpuTemperature: async()=>({ main: 0 }), networkStats: async()=>([]) };
     const path = require('path');
     const fs = require('fs');
     // Safe DOM helpers (views are loaded dynamically)

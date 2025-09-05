@@ -1,39 +1,110 @@
 # Mini Touch Dashboard
 
-A tiny Electron dashboard for a secondary touchscreen monitor on Windows. Shows **clock/date**, **weather**, **CPU load & temperature**, **memory**, **network up/down**, and a simple **RSS feed**. It launches borderless, **always-on-top**, and snaps itself to the *bottom-most* monitor (great for a small screen sitting under your main monitor).
+A tiny Electron dashboard for a secondary touchscreen (Windows-friendly). It shows:
+- Clock/date, Weather
+- CPU load/temperature, GPU temperature, Memory, Storage, Network up/down
+- Simple RSS feed
+
+Launches borderless, always-on-top, and snaps to the bottom-most monitor. Includes a tray menu for quick controls.
 
 ## Quick Start
 
-1. Install **Node.js LTS** (18+ recommended).
-2. Extract this folder, then in a terminal:
-   ```bash
-   cd mini-touch-dashboard
-   npm install
-   npm start
-   ```
+Prereqs:
+- Node.js LTS 18+ (or newer)
 
-The app opens on the lowest/bottom-most display it finds. It adds a **system tray** icon with options to toggle Always-on-Top, enable **Click-Through** (so mouse clicks pass through), Reload, or Quit.
+Run:
+```bash
+cd mini-touch-dashboard
+npm install
+npm start
+```
 
-## Configure
+Tray menu offers: Always-on-Top toggle, Click-Through, Reload, Quit.
 
-Open `config.json` and edit:
-- `latitude` / `longitude`: your location (used by Open-Meteo, no API key needed).
-- `temperatureUnit`: "fahrenheit" or "celsius".
-- `windSpeedUnit`: "mph" or "kmh".
-- `rssFeeds`: list of RSS URLs to show in the Feed card.
-- `theme`: "light", "dark", or "auto".
-- `refresh`: change polling intervals if you like.
+## Configuration
 
-> **CPU Temperature note (Windows):** We use [`systeminformation`](https://systeminformation.io/). On some systems, CPU temp may return `0` or `—` if the sensors aren't exposed. Installing motherboard vendor utilities or running the app with admin privileges sometimes helps. As a fallback, you can pair with HWiNFO and we can wire to its shared memory in a future step.
+Edit `config.json` to tailor the dashboard:
+- latitude / longitude: Coordinates for weather (Open‑Meteo; no API key).
+- temperatureUnit: `fahrenheit` or `celsius`.
+- windSpeedUnit: `mph` or `kmh`.
+- rssFeeds: Array of RSS/Atom feed URLs.
+- theme: `light`, `dark`, or `auto`.
+- refresh: Polling intervals (ms) per domain.
+- apps: Sidebar buttons (types: `dashboard`, `system`, `weather`, `web`, `browser`, `chatgpt`).
+- sidebar.itemsPerPage: How many app buttons per page.
+
+### System Metrics Modes
+
+There are two ways to populate system metrics in the System view (`views/system.*`):
+
+1) Local mode (default)
+- Uses the Node `systeminformation` library; no extra setup.
+- Works best when the dashboard runs on the same machine you want to monitor.
+
+2) Glances API mode (remote or local) — optional
+- Default is Local mode. Glances is optional and OFF by default.
+- To use Glances, set in `config.json`:
+  ```json
+  {
+    "metrics": {
+      "mode": "api",
+      "api": { "type": "glances", "baseUrl": "http://127.0.0.1:61208", "autoStart": true }
+    }
+  }
+  ```
+
+#### Install and Run Glances
+- Requires Python 3 and pip.
+- Install: `pip install glances`
+- Start web API locally: `glances -w`
+  - Default listens on `http://0.0.0.0:61208` with endpoints like `/api/3/all`.
+  - To bind to localhost only: `glances -w --bind 127.0.0.1`
+  - If exposing on a LAN, protect it (firewall/VPN/reverse proxy). Avoid exposing to the internet.
+- Point `config.json` `metrics.api.baseUrl` to the address (e.g., `http://<host>:61208`).
+
+What you get with Glances mode:
+- CPU %, CPU temp, GPU temp (when sensors are reported), memory, storage (per drive), top processes (CPU/Mem), and network activity lists.
+
+Optional: Add Glances UI as a sidebar app
+- Add an item in `config.json` `apps` with `type: "web"` and `url: "http://localhost:61208"` to embed Glances’ web UI.
+
+## CPU Temperature (Windows)
+
+In Local mode, temps come from `systeminformation`. On some hardware, CPU temp can show `-` (sensor not exposed). Running as admin or installing vendor monitoring tools can help. Glances mode often reports more sensors if available.
+
+## Development
+
+- Live-reload is built-in for renderer changes. Edit HTML/JS/CSS and the app reloads. Changes to `main.js` trigger a relaunch.
+- Dev script: `npm run dev` (uses `electronmon`).
 
 ## Tips
 
-- To **auto-start** with Windows: create a shortcut to `npm start` (or a packaged exe) in `shell:startup`.
-- To lock the app to a **specific monitor**, change the selection logic in `main.js` (`pickBottomDisplay()`). You can pick by display `id` or look for a specific resolution/position.
-- For **touch only** (no mouse), enable **Click-Through** from the tray to avoid accidentally selecting the window; touch taps will still work on buttons/links inside.
+- Auto-start on Windows: put a shortcut to a packaged app or a script that runs `npm start` into `shell:startup`.
+- Lock to a specific monitor: adjust `pickBottomDisplay()` in `main.js` to choose by display id/position.
+- Touch-only overlay: enable Click-Through from the tray so the window doesn’t capture mouse clicks; touch interactions inside still work.
 
-## Roadmap (if you want to extend)
-- Add GPU temp/fans (via `systeminformation.graphics()`).
-- Add calendar cards (Google/Outlook APIs).
-- Integrate selected app notifications (Slack/Discord/Email) into the Feed.
-- Add a settings UI editable from the touchscreen.
+## Troubleshooting
+
+## Packaging and Installer
+
+- Portable EXE (no install): `npm run build:win:portable`
+- Windows Installer (NSIS): `npm run build:win`
+  - If a Glances binary is bundled, it is copied during install; however, Local mode remains the default and Glances is not started unless you enable API mode in `config.json`.
+  - To avoid bundling, simply remove `extras/glances-web.exe` before building.
+
+Build prerequisites on Windows:
+- Run the build in an elevated terminal or enable Windows Developer Mode (to avoid symlink extraction issues with electron-builder tools).
+- If you prefer no installer, the portable build produces a single `.exe`.
+
+### Bundling Glances by Default
+
+- Place your Glances wrapper binary at `extras/glances-web.exe` before running `npm run build:win`. The installer selects "Install local Glances" by default and will copy it into the installed app.
+- Alternatively, set `!define GLANCES_URL` in `build/installer.nsh` to a URL you control so the installer downloads the binary at install time.
+
+- Glances API unreachable: verify `glances -w` is running and `baseUrl` matches. If remote, confirm firewall allows port 61208.
+- Mixed metrics or odd characters: ensure `config.json` is saved as UTF-8 and icons use standard emoji/characters.
+- Weather blank: verify `latitude`/`longitude` and that outbound HTTPS is allowed.
+
+## License
+
+Personal/experimental project — adapt freely within your environment.

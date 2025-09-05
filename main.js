@@ -1,4 +1,5 @@
 const { app, BrowserWindow, screen, Menu, Tray, nativeTheme } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -14,6 +15,7 @@ function loadConfig() {
 let tray = null;
 let win = null;
 let reloadWatcher = null;
+let glancesProc = null;
 
 function pickBottomDisplay() {
   const displays = screen.getAllDisplays();
@@ -32,6 +34,9 @@ function createWindow() {
   if (config.theme && config.theme !== 'auto') {
     nativeTheme.themeSource = config.theme;
   }
+
+  // Optionally auto-start a bundled Glances web server if configured and present
+  maybeStartGlances(config);
 
   const targetDisplay = pickBottomDisplay();
   const { x, y, width, height } = targetDisplay.bounds;
@@ -117,3 +122,43 @@ function setupAutoReload(config) {
 }
 
 app.on('before-quit', () => { try { reloadWatcher?.close?.(); } catch {} });
+
+function maybeStartGlances(config) {
+  try {
+    const apiCfg = (config.metrics && config.metrics.api) || {};
+    const isGlances = config.metrics && config.metrics.mode === 'api' && apiCfg.type === 'glances';
+    const auto = apiCfg.autoStart !== false; // default true
+    if (!isGlances || !auto) return;
+
+    const base = process.resourcesPath || __dirname;
+    const candidates = [
+      // If installed by installer step
+      path.join(base, 'glances', 'glances-web.exe'),
+      // If shipped as extraResource
+      path.join(base, 'extras', 'glances-web.exe'),
+      // Dev/runtime fallbacks
+      path.join(__dirname, 'glances', 'glances-web.exe'),
+      path.join(__dirname, 'extras', 'glances-web.exe')
+    ];
+    const exe = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+    if (!exe) return;
+    if (glancesProc && !glancesProc.killed) return;
+    const env = { ...process.env };
+    if (apiCfg.baseUrl) {
+      try {
+        const u = new URL(String(apiCfg.baseUrl));
+        if (u.hostname) env.GLANCES_BIND = u.hostname;
+        if (u.port) env.GLANCES_PORT = u.port;
+      } catch {}
+    }
+    if (Number.isFinite(apiCfg.refreshSec)) env.GLANCES_REFRESH = String(apiCfg.refreshSec);
+    if (Array.isArray(apiCfg.disablePlugins) && apiCfg.disablePlugins.length) {
+      env.GLANCES_DISABLE_PLUGINS = apiCfg.disablePlugins.join(',');
+    }
+    glancesProc = spawn(exe, [], { stdio: 'ignore', windowsHide: true, env });
+  } catch {}
+}
+
+app.on('before-quit', () => {
+  try { if (glancesProc && !glancesProc.killed) glancesProc.kill(); } catch {}
+});

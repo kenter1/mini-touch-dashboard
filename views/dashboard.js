@@ -319,6 +319,11 @@ exports.init = function init(ctx) {
         (function enableDrag() {
           const pageRef = page; // same object
           let dragState = null;
+          function getPoint(ev) {
+            if (ev && ev.touches && ev.touches[0]) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+            if (ev && ev.changedTouches && ev.changedTouches[0]) return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
+            return { x: ev.clientX, y: ev.clientY };
+          }
           function buildOccExcludingSelf() {
             const occ2 = occupied.map(row => row.slice());
             for (let rr = startR; rr < startR + (rspan || rows); rr++) {
@@ -364,7 +369,8 @@ exports.init = function init(ctx) {
             hint.style.pointerEvents = 'none';
             dragLayer.appendChild(hint);
             grid.appendChild(dragLayer);
-            const startMouse = { x: ev.clientX, y: ev.clientY };
+            const pt0 = getPoint(ev);
+            const startMouse = { x: pt0.x, y: pt0.y };
             const startPos = {
               left: Math.round(gridRect.left + startC * (colW + gap)),
               top: Math.round(gridRect.top + startR * (rowH + gap))
@@ -375,6 +381,9 @@ exports.init = function init(ctx) {
             dragState = { gap, colW, rowH, gridRect, dragLayer, ghost, hint, occ2, drop: null };
             window.addEventListener('mousemove', onMove, true);
             window.addEventListener('mouseup', onUp, true);
+            try { window.addEventListener('touchmove', onMove, { capture: true, passive: false }); } catch { window.addEventListener('touchmove', onMove, true); }
+            window.addEventListener('touchend', onUp, true);
+            window.addEventListener('touchcancel', onUp, true);
           }
           function snapToCell(clientX, clientY, st) {
             const x = clientX - st.gridRect.left;
@@ -400,7 +409,8 @@ exports.init = function init(ctx) {
             if (!dragState) return;
             ev.preventDefault(); ev.stopPropagation();
             const st = dragState;
-            const snap = snapToCell(ev.clientX, ev.clientY, st);
+            const pt = getPoint(ev);
+            const snap = snapToCell(pt.x, pt.y, st);
             const left = Math.round(snap.col * (st.colW + st.gap));
             const top = Math.round(snap.row * (st.rowH + st.gap));
             st.ghost.style.left = left + 'px';
@@ -423,6 +433,9 @@ exports.init = function init(ctx) {
             const st = dragState;
             window.removeEventListener('mousemove', onMove, true);
             window.removeEventListener('mouseup', onUp, true);
+            try { window.removeEventListener('touchmove', onMove, { capture: true }); } catch { window.removeEventListener('touchmove', onMove, true); }
+            window.removeEventListener('touchend', onUp, true);
+            window.removeEventListener('touchcancel', onUp, true);
             try { st.dragLayer.remove(); } catch {}
             document.body.style.userSelect = '';
             try { card.classList.remove('dragging'); grid.classList.remove('is-dragging'); } catch {}
@@ -435,6 +448,7 @@ exports.init = function init(ctx) {
             dragState = null;
           }
           card.addEventListener('mousedown', onDown, true);
+          try { card.addEventListener('touchstart', (ev)=>{ if (ev.touches && ev.touches.length>1) return; onDown(ev); }, { capture: true, passive: false }); } catch { card.addEventListener('touchstart', (ev)=>{ if (ev.touches && ev.touches.length>1) return; onDown(ev); }, true); }
         })();
                 // Floating controls (overlay)
         const ctrls = document.createElement('div');

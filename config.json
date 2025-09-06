@@ -85,7 +85,7 @@
           {
             "type": "weather",
             "span": 1,
-            "col": 1,
+            "col": 0,
             "rspan": 2,
             "row": 0
           },
@@ -100,7 +100,7 @@
             "type": "digital-clock",
             "span": 1,
             "col": 2,
-            "row": 0,
+            "row": 1,
             "rspan": 1
           }
         ],

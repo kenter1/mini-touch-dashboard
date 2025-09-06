@@ -86,8 +86,8 @@
             "type": "weather",
             "span": 1,
             "col": 0,
-            "rspan": 2,
-            "row": 0
+            "rspan": 1,
+            "row": 1
           },
           {
             "type": "system",
@@ -107,6 +107,7 @@
         "split": true
       }
     ],
-    "pageIndex": 0
+    "pageIndex": 0,
+    "navEnabled": false
   }
 }

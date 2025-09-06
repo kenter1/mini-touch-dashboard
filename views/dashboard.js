@@ -1,4 +1,4 @@
-﻿// Dashboard: configurable widget grid with pages/slots
+// Dashboard: configurable widget grid with pages/slots
 exports.init = function init(ctx) {
   const { config } = ctx;
   const path = require('path');
@@ -13,6 +13,8 @@ exports.init = function init(ctx) {
   function clearTimers() { try { timers.forEach(clearInterval); } catch {} timers = []; }
   let editMode = false;
   const dash = (config.dashboard = config.dashboard || {});
+  // Default: navigation/header enabled unless explicitly disabled
+  if (typeof dash.navEnabled === 'undefined') dash.navEnabled = true;
   dash.pages = Array.isArray(dash.pages) && dash.pages.length ? dash.pages : [
     { columns: 3, widgets: [ { type:'clock', span: 1 }, { type:'weather', span: 1 }, { type:'system', span: 1 } ] }
   ];
@@ -199,11 +201,14 @@ exports.init = function init(ctx) {
     const page = dash.pages[pageIndex] || { columns: 3, widgets: [] };
     const cols = Math.max(1, Math.min(6, Number(page.columns) || 3));
     const rows = page.split ? 2 : 1;
+    // If nav is disabled, force edit off and hide header later
+    if (dash.navEnabled === false && editMode) editMode = false;
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
     grid.innerHTML = '';
 
     // Header controls
+    const header = document.getElementById('dashHeader'); if (header) header.style.display = (dash.navEnabled === false) ? 'none' : '';
     const pageLabel = document.getElementById('dashPageLabel'); if (pageLabel) pageLabel.textContent = `Page ${pageIndex+1} / ${dash.pages.length}`;
     const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
     const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
@@ -452,23 +457,24 @@ exports.init = function init(ctx) {
         })();
                 // Floating controls (overlay)
         const ctrls = document.createElement('div');
+        ctrls.className = 'edit-ctrls';
         ctrls.style.position = 'absolute';
-        ctrls.style.top = '6px';
-        ctrls.style.right = '6px';
+        ctrls.style.top = '8px';
+        ctrls.style.right = '8px';
         ctrls.style.display = 'flex';
-        ctrls.style.gap = '6px';
+        ctrls.style.gap = '10px';
         ctrls.style.background = 'rgba(0,0,0,0.35)';
-        ctrls.style.backdropFilter = 'blur(4px)';
-        ctrls.style.padding = '4px 6px';
-        ctrls.style.borderRadius = '8px';
+        ctrls.style.backdropFilter = 'blur(6px)';
+        ctrls.style.padding = '6px 8px';
+        ctrls.style.borderRadius = '12px';
         ctrls.style.pointerEvents = 'auto';
-        const mkBtn = (label, title) => { const b = document.createElement('button'); b.className='small-btn'; b.textContent=label; b.title=title; b.style.padding='4px 8px'; b.style.lineHeight='1'; return b; };
+        const mkBtn = (label, title) => { const b = document.createElement('button'); b.className='edit-btn'; b.textContent=label; b.title=title; b.style.lineHeight='1'; return b; };
         const dec = mkBtn('-', 'Narrower');
-        const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span;
+        const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span; spanPill.style.fontSize='14px'; spanPill.style.padding='6px 10px';
         const inc = mkBtn('+', 'Wider');
-        const half = mkBtn('½', 'Half height');
-        const full = mkBtn('1', 'Full height');
-        const del = mkBtn('x', 'Remove');
+        const half = mkBtn('Half', 'Half height');
+        const full = mkBtn('Full', 'Full height');
+        const del = mkBtn('Delete', 'Remove');
         dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Number(w.span||1) - 1); saveConfig(); render(); };
         inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, Number(w.span||1) + 1); saveConfig(); render(); };
         half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min((w.row|0), rows-1)); saveConfig(); render(); } };
@@ -495,12 +501,12 @@ exports.init = function init(ctx) {
     }
     bind(document.getElementById('dashColsDec'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); });
     bind(document.getElementById('dashColsInc'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); });
-    bind(document.getElementById('dashToggleEdit'), () => { editMode = !editMode; render(); });
+    bind(document.getElementById('dashToggleEdit'), () => { if (dash.navEnabled === false) { editMode = false; } else { editMode = !editMode; } render(); });
     bind(document.getElementById('dashToggleSplit'), () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); });
   }
   wireHeaderControls();
 
-  // Last‑resort global handler in capture phase to guarantee header clicks work
+  // Last-resort global handler in capture phase to guarantee header clicks work
   try {
     if (!window.__dashHeaderDelegation) {
       window.__dashHeaderDelegation = true;
@@ -609,7 +615,7 @@ exports.init = function init(ctx) {
   try {
     window.dashColsDec = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); };
     window.dashColsInc = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
-    window.dashToggleEdit = () => { editMode = !editMode; render(); };
+    window.dashToggleEdit = () => { if (dash.navEnabled === false) { editMode = false; } else { editMode = !editMode; } render(); };
     window.dashToggleSplit = () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); };
   } catch {}
   exports.destroy = function destroy() { clearTimers(); };

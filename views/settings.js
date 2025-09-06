@@ -17,6 +17,8 @@ exports.init = function init(ctx) {
   function renderGeneral() {
     if (!generalBox) return;
     const sidebar = ensureSidebar(config);
+    const dashboard = (config.dashboard = config.dashboard || {});
+    const navEnabled = dashboard.navEnabled !== false; // default on
     const theme = config.theme || 'auto';
     generalBox.innerHTML = `
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; align-items:center;">
@@ -35,6 +37,13 @@ exports.init = function init(ctx) {
             <input id="itemsPerPage" type="number" min="1" max="12" value="${sidebar.itemsPerPage || 5}" style="flex:1; height:40px; font-size:16px; text-align:center; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12);">
             <button class="small-btn" id="itemsInc" style="width:40px;">+</button>
           </div>
+        </div>
+        <div>
+          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Dashboard Navigation Panel</div>
+          <label style="display:flex; align-items:center; gap:10px; height:40px;">
+            <input id="genDashNav" type="checkbox" ${navEnabled?'checked':''} />
+            <span>Enable dashboard header (pages, edit, columns)</span>
+          </label>
         </div>
       </div>
     `;
@@ -178,6 +187,9 @@ exports.init = function init(ctx) {
       sidebar.itemsPerPage = Math.min(12, Math.max(1, items));
       const themeEl = generalBox?.querySelector('#genTheme');
       config.theme = themeEl?.value || config.theme || 'auto';
+      // dashboard nav toggle
+      const navEl = generalBox?.querySelector('#genDashNav');
+      (config.dashboard = config.dashboard || {}).navEnabled = !!(navEl ? navEl.checked : true);
 
       // collect apps
       config.apps = collectSettingsFromUI();

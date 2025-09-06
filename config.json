@@ -13,7 +13,7 @@
       "type": "glances",
       "baseUrl": "http://127.0.0.1:61208",
       "autoStart": true,
-      "refreshSec": 5,
+      "refreshSec": 1,
       "disablePlugins": []
     },
     "lhm": {
@@ -23,7 +23,7 @@
   "theme": "auto",
   "refresh": {
     "metricsMs": 1500,
-    "metricsMsApi": 5000,
+    "metricsMsApi": 1500,
     "weatherMs": 600000,
     "rssMs": 600000
   },

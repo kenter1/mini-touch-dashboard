@@ -4,6 +4,7 @@ exports.init = function init(ctx) {
   // Always show CPU/GPU temps in Celsius regardless of global setting
   const UNIT = '\u00B0C';
   const { execFile } = require('child_process');
+  const si = require('systeminformation');
   function execFileSafe(cmd, args, options) {
     return new Promise((resolve) => {
       const child = execFile(cmd, args, { timeout: 1500, windowsHide: true, ...options }, (err, stdout) => {
@@ -323,19 +324,7 @@ exports.init = function init(ctx) {
 
         return;
         }
-        // API mode requested but no data reachable — do not fall back to local to avoid PowerShell/WMI usage
-        // Optionally, clear or placeholder the UI
-        const placeholders = () => {
-          const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-          set('cpuLoad', '-%');
-          set('cpuTemp', '-');
-          set('gpuTemp', '-');
-          set('memUsed', '-');
-          set('netDown', '-');
-          set('netUp', '-');
-        };
-        placeholders();
-        return;
+        // API mode requested but no data reachable; fall back to local polling
       }
       const [load, mem, temp, net, gfx, disks, procs] = await Promise.all([
         si.currentLoad(),

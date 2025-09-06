@@ -197,7 +197,13 @@ exports.init = function init(ctx) {
       themeSeg.forEach(b => { b.style.outline = (b.dataset.val===val)?'2px solid var(--accent)':'1px solid rgba(255,255,255,0.12)'; b.style.background = (b.dataset.val===val)?'rgba(77,163,255,0.18)':'var(--card)'; });
       themeSel.value = val;
     };
-    themeSeg.forEach(b => b.addEventListener('click', ()=> setThemeUI(b.dataset.val)));
+    themeSeg.forEach(b => b.addEventListener('click', ()=> {
+      const val = b.dataset.val;
+      setThemeUI(val);
+      try { config.theme = val; } catch {}
+      try { window.applyTheme && window.applyTheme(config); } catch {}
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
+    }));
     setThemeUI(themeSel.value || 'auto');
 
     // Background segmented
@@ -251,7 +257,12 @@ exports.init = function init(ctx) {
       navToggle.style.background = navChk.checked ? 'var(--accent)' : 'rgba(255,255,255,0.15)';
       const knob = navToggle.firstElementChild; if (knob) knob.style.left = navChk.checked ? '26px' : '2px';
     };
-    navToggle?.addEventListener('click', ()=>{ navChk.checked = !navChk.checked; updateNavToggle(); });
+    const syncNavToConfig = () => {
+      try { (config.dashboard = config.dashboard || {}).navEnabled = !!navChk.checked; } catch {}
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
+    };
+    navToggle?.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); navChk.checked = !navChk.checked; updateNavToggle(); syncNavToConfig(); });
+    navChk?.addEventListener('change', ()=>{ updateNavToggle(); syncNavToConfig(); });
     updateNavToggle();
   }
 

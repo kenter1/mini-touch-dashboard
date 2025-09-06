@@ -92,15 +92,15 @@
           {
             "type": "system",
             "span": 1,
-            "col": 3,
+            "col": 2,
             "row": 0,
             "rspan": 1
           },
           {
             "type": "digital-clock",
             "span": 1,
-            "col": 2,
-            "row": 1,
+            "col": 1,
+            "row": 0,
             "rspan": 1
           }
         ],
@@ -108,10 +108,9 @@
       }
     ],
     "pageIndex": 0,
-    "navEnabled": false
+    "navEnabled": true
   },
   "background": {
-    "mode": "solid",
-    "color": "#1949cc"
+    "mode": "windows"
   }
 }

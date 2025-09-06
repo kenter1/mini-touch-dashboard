@@ -29,6 +29,14 @@ Edit `config.json` to tailor the dashboard:
 - windSpeedUnit: `mph` or `kmh`.
 - rssFeeds: Array of RSS/Atom feed URLs.
 - theme: `light`, `dark`, or `auto`.
+- ui.widgetGlassOpacity: 0–100. Controls widget card transparency (lower = more glass). Default 100 (opaque).
+  - Settings shortcut: Settings → General → Appearance → "Widget Glass Opacity" or use the "Background: Visible/Hidden" toggle button.
+ - ui.widgetBackgroundVisible: true/false. When false, dashboard widget cards remove their background and shadow entirely so no edges are visible. The widget content remains.
+
+Hide a widget
+- Enter Dashboard, toggle Edit: On (header).
+- Click the widget’s overlay controls, press Hide. Use Show to bring it back.
+- In `config.json`, you can also set `invisible: true` on a widget entry under `dashboard.pages[].widgets[]`.
 - refresh: Polling intervals (ms) per domain.
 - apps: Sidebar buttons (types: `dashboard`, `system`, `weather`, `web`, `browser`, `chatgpt`).
 - sidebar.itemsPerPage: How many app buttons per page.

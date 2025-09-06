@@ -308,6 +308,27 @@ exports.init = function init(ctx) {
       card.className = 'card';
       card.style.gridColumn = `${startC + 1} / span ${span}`;
       card.style.gridRow = `${startR + 1} / span ${rspan || rows}`;
+      // Respect global UI preference for widget background visibility
+      try {
+        const bgVisible = !(((config.ui || {}).widgetBackgroundVisible) === false);
+        if (!bgVisible) {
+          card.style.background = 'transparent';
+          card.style.boxShadow = 'none';
+          card.style.border = 'none';
+          card.style.backdropFilter = 'none';
+          try { card.style.webkitBackdropFilter = 'none'; } catch {}
+        }
+      } catch {}
+      const isHidden = !!w.invisible;
+      if (isHidden && !editMode) {
+        // Keep layout space but make the widget invisible and non-interactive
+        card.style.opacity = '0';
+        card.style.pointerEvents = 'none';
+        card.style.boxShadow = 'none';
+        card.style.border = 'none';
+        card.style.backdropFilter = 'none';
+        try { card.style.webkitBackdropFilter = 'none'; } catch {}
+      }
       if (editMode) {
         // Overlay outline (non-blocking)
         card.style.position = 'relative';
@@ -319,6 +340,19 @@ exports.init = function init(ctx) {
         outline.style.pointerEvents = 'none';
         outline.style.boxSizing = 'border-box';
         card.appendChild(outline);
+        if (isHidden) {
+          // Indicate hidden state during edit so users can unhide
+          const hiddenTag = document.createElement('div');
+          hiddenTag.className = 'pill';
+          hiddenTag.textContent = 'Hidden';
+          hiddenTag.style.position = 'absolute';
+          hiddenTag.style.top = '8px';
+          hiddenTag.style.left = '8px';
+          hiddenTag.style.pointerEvents = 'none';
+          card.appendChild(hiddenTag);
+          // Slightly fade content in edit mode to hint hidden status
+          card.style.opacity = '0.5';
+        }
         // Drag handle: allow dragging the entire card (ignore clicks on buttons/links)
         card.style.cursor = 'move';
         (function enableDrag() {
@@ -475,12 +509,17 @@ exports.init = function init(ctx) {
         const half = mkBtn('Half', 'Half height');
         const full = mkBtn('Full', 'Full height');
         const del = mkBtn('Delete', 'Remove');
+        const hideBtn = mkBtn(isHidden ? 'Show' : 'Hide', isHidden ? 'Show widget' : 'Hide widget');
         dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Number(w.span||1) - 1); saveConfig(); render(); };
         inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, Number(w.span||1) + 1); saveConfig(); render(); };
         half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min((w.row|0), rows-1)); saveConfig(); render(); } };
         full.onclick = (e) => { e.stopPropagation(); w.rspan = rows; w.row = 0; saveConfig(); render(); };
         del.onclick = (e) => { e.stopPropagation(); const arr = page.widgets || []; const i0 = arr.indexOf(w); if (i0 >= 0) arr.splice(i0,1); saveConfig(); render(); };
-        ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc); if (rows>1){ ctrls.appendChild(half); ctrls.appendChild(full);} ctrls.appendChild(del);
+        hideBtn.onclick = (e) => { e.stopPropagation(); w.invisible = !isHidden; saveConfig(); render(); };
+        ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc);
+        if (rows>1){ ctrls.appendChild(half); ctrls.appendChild(full);} 
+        ctrls.appendChild(hideBtn);
+        ctrls.appendChild(del);
         card.appendChild(ctrls);
       }
       const body = document.createElement('div');

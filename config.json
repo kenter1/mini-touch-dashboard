@@ -92,15 +92,15 @@
           {
             "type": "system",
             "span": 1,
-            "col": 2,
+            "col": 3,
             "row": 0,
             "rspan": 1
           },
           {
             "type": "digital-clock",
             "span": 1,
-            "col": 1,
-            "row": 0,
+            "col": 3,
+            "row": 1,
             "rspan": 1
           }
         ],
@@ -108,9 +108,13 @@
       }
     ],
     "pageIndex": 0,
-    "navEnabled": true
+    "navEnabled": false
   },
   "background": {
     "mode": "windows"
+  },
+  "ui": {
+    "widgetGlassOpacity": 52,
+    "widgetBackgroundVisible": false
   }
 }

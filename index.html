@@ -11,6 +11,9 @@
       --fg: #e8eefc;
       --muted: #97a3b6;
       --card: #121828;
+      --card-rgb: 18, 24, 40;
+      --card-alpha: 1;
+      --glass-blur: 0px;
       --accent: #4da3ff;
       --good: #2ecc71;
       --warn: #f1c40f;
@@ -22,10 +25,11 @@
       --fg: #e8eefc;
       --muted: #97a3b6;
       --card: #121828;
+      --card-rgb: 18, 24, 40;
       --accent: #4da3ff;
     }
     :root[data-theme="light"] {
-      --bg:#f5f7fb; --fg:#0b0f1a; --muted:#4a5568; --card:#ffffff; --accent:#1e88e5;
+      --bg:#f5f7fb; --fg:#0b0f1a; --muted:#4a5568; --card:#ffffff; --card-rgb: 255, 255, 255; --accent:#1e88e5;
     }
     /* Auto mode (no data-theme) follows OS preference */
     @media (prefers-color-scheme: light) {
@@ -81,7 +85,8 @@
       box-sizing: border-box;
     }
     .card {
-      background: var(--card);
+      background: rgba(var(--card-rgb, 18, 24, 40), var(--card-alpha, 1));
+      backdrop-filter: blur(var(--glass-blur, 0px));
       border-radius: 16px;
       padding: 14px 16px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.25);
@@ -212,6 +217,18 @@
       } catch {}
     };
 
+    // Card glass helper: controls widget card transparency + blur
+    window.applyGlass = function applyGlass(cfg) {
+      try {
+        const root = document.documentElement;
+        const ui = (cfg && cfg.ui) || {};
+        const pct = Math.max(0, Math.min(100, Number.isFinite(ui.widgetGlassOpacity) ? ui.widgetGlassOpacity : 100));
+        const alpha = Math.round(pct) / 100;
+        root.style.setProperty('--card-alpha', String(alpha));
+        root.style.setProperty('--glass-blur', alpha < 1 ? '8px' : '0px');
+      } catch {}
+    };
+
     // Background application helper
     function getWindowsWallpaperPath() {
       try {
@@ -310,6 +327,7 @@
     // Apply on startup
     try { window.applyTheme(config); } catch {}
     try { window.applyBackground(config); } catch {}
+    try { window.applyGlass(config); } catch {}
 
     const UNIT = config.temperatureUnit === 'fahrenheit' ? 'Â°F' : 'Â°C';
 
@@ -497,6 +515,7 @@
     window.addEventListener('config-updated', () => {
       try { window.applyTheme(config); } catch {}
       try { window.applyBackground(config); } catch {}
+      try { window.applyGlass(config); } catch {}
       // Let the active dynamic view decide how to handle updates (dashboard listens and re-renders)
       try { currentViewModule?.onConfigUpdated?.(config); } catch {}
     });

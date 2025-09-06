@@ -116,6 +116,9 @@ exports.init = function init(ctx) {
     const navEnabled = dashboard.navEnabled !== false;
     const theme = config.theme || 'auto';
     const bg = config.background || { mode: 'solid', color: '#0b0f1a' };
+    const ui = (config.ui = config.ui || {});
+    const glass = Number.isFinite(ui.widgetGlassOpacity) ? ui.widgetGlassOpacity : 100;
+    const bgVisible = ui.widgetBackgroundVisible !== false;
     generalBox.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:12px; align-items:stretch;">
         <div class="card" style="gap:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03);">
@@ -162,6 +165,22 @@ exports.init = function init(ctx) {
               </div>
             </div>
             <div id="bgWinWrap" class="sub" style="${bg.mode==='windows'?'':'display:none;'}">Uses your current Windows wallpaper.</div>
+          </div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Widget Glass Opacity</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="small-btn" id="glassDec" style="width:36px; height:32px;">-</button>
+              <input id="glassOpacity" type="range" min="0" max="100" value="${glass}" style="flex:1; accent-color: var(--accent);">
+              <button class="small-btn" id="glassInc" style="width:36px; height:32px;">+</button>
+              <div id="glassVal" class="pill" style="min-width:46px; text-align:center;">${glass}%</div>
+            </div>
+            <div class="sub">Lower values increase transparency and blur for widget cards.</div>
+            <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+              <button class="small-btn" id="glassToggleBtn" style="height:32px;">
+                ${bgVisible ? 'Background: Visible' : 'Background: Hidden'}
+              </button>
+              <div class="sub">Quick toggle for widget background visibility.</div>
+            </div>
           </div>
         </div>
 
@@ -237,6 +256,32 @@ exports.init = function init(ctx) {
     fileInput?.addEventListener('change', ()=>{
       const f = fileInput.files && fileInput.files[0];
       if (f && f.path) { pathInput.value = f.path; }
+    });
+
+    // Glass controls
+    const glassRange = generalBox.querySelector('#glassOpacity');
+    const glassValEl = generalBox.querySelector('#glassVal');
+    const glassDec = generalBox.querySelector('#glassDec');
+    const glassInc = generalBox.querySelector('#glassInc');
+    const clampGlass = () => {
+      const v = Math.max(0, Math.min(100, parseInt(glassRange.value, 10) || 0));
+      glassRange.value = String(v);
+      glassValEl.textContent = v + '%';
+      try { (config.ui = config.ui || {}).widgetGlassOpacity = v; } catch {}
+      try { window.applyGlass && window.applyGlass(config); } catch {}
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
+    };
+    glassRange?.addEventListener('input', clampGlass);
+    glassDec?.addEventListener('click', ()=>{ glassRange.value = String(Math.max(0, (parseInt(glassRange.value,10)||0)-5)); clampGlass(); });
+    glassInc?.addEventListener('click', ()=>{ glassRange.value = String(Math.min(100, (parseInt(glassRange.value,10)||0)+5)); clampGlass(); });
+    const glassToggleBtn = generalBox.querySelector('#glassToggleBtn');
+    glassToggleBtn?.addEventListener('click', ()=>{
+      const visible = !(((config.ui || {}).widgetBackgroundVisible) === false);
+      (config.ui = config.ui || {}).widgetBackgroundVisible = !visible;
+      // Update button label
+      try { glassToggleBtn.textContent = (!visible) ? 'Background: Visible' : 'Background: Hidden'; } catch {}
+      // Notify views (dashboard will re-render and remove background/shadow when hidden)
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
     });
 
     // Items per page controls
@@ -402,6 +447,7 @@ exports.init = function init(ctx) {
       renderSettings();
       try { window.applyTheme && window.applyTheme(config); } catch {}
       try { window.applyBackground && window.applyBackground(config); } catch {}
+      try { window.applyGlass && window.applyGlass(config); } catch {}
       try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
     } catch (e) {
       alert('Failed to reload config.json');
@@ -440,12 +486,21 @@ exports.init = function init(ctx) {
         delete bg.color; delete bg.path;
       }
 
+      // glass opacity
+      const gEl = generalBox?.querySelector('#glassOpacity');
+      const gVal = gEl ? parseInt(gEl.value, 10) : ((config.ui && config.ui.widgetGlassOpacity) || 100);
+      (config.ui = config.ui || {}).widgetGlassOpacity = Math.max(0, Math.min(100, Number.isFinite(gVal) ? gVal : 100));
+      // widget background visibility (button updates config live; keep current value)
+      const bgVis = (config.ui && config.ui.widgetBackgroundVisible);
+      (config.ui = config.ui || {}).widgetBackgroundVisible = (bgVis !== false);
+
       // collect apps
       config.apps = collectSettingsFromUI();
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
       rebuildSidebar();
       try { window.applyTheme && window.applyTheme(config); } catch {}
       try { window.applyBackground && window.applyBackground(config); } catch {}
+      try { window.applyGlass && window.applyGlass(config); } catch {}
       try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
       alert('Saved');
     } catch (e) {

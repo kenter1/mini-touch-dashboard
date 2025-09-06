@@ -1,8 +1,8 @@
 ﻿// System-only view module (expanded)
 exports.init = function init(ctx) {
   const { config } = ctx;
-  // Avoid local systeminformation to prevent PowerShell/WMI churn on Windows
-  const UNIT = config.temperatureUnit === 'fahrenheit' ? '\u00B0F' : '\u00B0C';
+  // Always show CPU/GPU temps in Celsius regardless of global setting
+  const UNIT = '\u00B0C';
   const { execFile } = require('child_process');
   function execFileSafe(cmd, args, options) {
     return new Promise((resolve) => {
@@ -34,7 +34,8 @@ exports.init = function init(ctx) {
       return { util: Math.max(0, Math.min(100, maxUtil)), temp: maxTemp };
     } catch { return null; }
   }
-  const wantF = config.temperatureUnit === 'fahrenheit';
+  // Force Celsius for sensor temps and charts
+  const wantF = false;
   const apiCfg = (config.metrics && config.metrics.api) || {};
   const apiMode = config.metrics && config.metrics.mode === 'api' && apiCfg.type === 'glances' && apiCfg.baseUrl;
   let timer = null;
@@ -46,11 +47,27 @@ exports.init = function init(ctx) {
   async function getLhmTemps() {
     if (!isWin) return null;
     // Try LibreHardwareMonitor's built-in web server default
-    const base = ((config.metrics && config.metrics.lhm && config.metrics.lhm.baseUrl) || 'http://localhost:8085').replace(/\/+$/,'');
+    const rawBase = ((config.metrics && config.metrics.lhm && config.metrics.lhm.baseUrl) || 'http://localhost:8085').replace(/\/+$/,'');
+    const bases = (()=>{
+      try {
+        const u = new URL(rawBase);
+        const arr = [`${u.protocol}//${u.host}`.replace(/\/+$/,'')];
+        if (/^localhost(?::|$)/i.test(u.host)) {
+          const port = u.port ? `:${u.port}` : '';
+          arr.push(`${u.protocol}//127.0.0.1${port}`);
+        }
+        return arr;
+      } catch { return [rawBase]; }
+    })();
     try {
-      const res = await fetch(base + '/data.json', { cache: 'no-store' });
-      if (!res.ok) return null;
-      const data = await res.json();
+      let data = null;
+      for (const b of bases) {
+        try {
+          const res = await fetch(b + '/data.json', { cache: 'no-store' });
+          if (res.ok) { data = await res.json(); break; }
+        } catch {}
+      }
+      if (!data) return null;
       const out = { cpu: null, gpu: null };
       const seen = new Set();
       function scan(node) {
@@ -63,8 +80,11 @@ exports.init = function init(ctx) {
           const label = String(t || '').toLowerCase();
           const v = Number(n);
           if (!Number.isFinite(v)) return;
-          if (/cpu/.test(label)) { out.cpu = Math.max(out.cpu ?? -Infinity, v); }
-          if (/(gpu|graphics|nvidia|radeon|amd)/.test(label)) { out.gpu = Math.max(out.gpu ?? -Infinity, v); }
+          const isGpu = /(gpu|graphics|nvidia|radeon|amd)/.test(label);
+          if (/(cpu|package|tctl|tdie)/.test(label) || (/core/.test(label) && !isGpu)) {
+            out.cpu = Math.max(out.cpu ?? -Infinity, v);
+          }
+          if (isGpu) { out.gpu = Math.max(out.gpu ?? -Infinity, v); }
         };
         if (typeof val === 'number') {
           if (type.toLowerCase() === 'temperature' || /temp/i.test(text)) tryRecord(text, val);
@@ -189,7 +209,13 @@ exports.init = function init(ctx) {
           if (lhm) { cpuTempC = Number(lhm.cpu)||0; gpuTempC = Number(lhm.gpu)||0; }
         } catch {}
         if (!(cpuTempC > 0)) cpuTempC = findSensor([/cpu|package|tctl|tdie/i]);
-        if (!(gpuTempC > 0)) gpuTempC = findSensor([/gpu|nvidia|radeon/i]);
+        if (!(gpuTempC > 0)) {
+          gpuTempC = findSensor([/gpu|nvidia|radeon/i]);
+          // Final fallback: NVIDIA CLI if available
+          if (!(gpuTempC > 0)) {
+            try { const g = await getNvidiaGpu(); if (g && Number(g.temp) > 0) gpuTempC = Number(g.temp); } catch {}
+          }
+        }
         const cpuTempDisp = toDisplayTemp(cpuTempC);
         const gpuTempDisp = toDisplayTemp(gpuTempC);
         const cpuTemp = document.getElementById('cpuTemp'); if (cpuTemp) cpuTemp.textContent = (cpuTempDisp>0?cpuTempDisp+UNIT:'-');

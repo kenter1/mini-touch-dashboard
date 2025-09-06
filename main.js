@@ -208,6 +208,26 @@ function maybeStartLibreHardwareMonitor(config) {
     try { fs.chmodSync(exe, 0o755); } catch {}
 
     const cwd = path.dirname(exe);
+    // Seed user config to enable LHM web server if needed
+    try {
+      const bundledCfgCandidates = [
+        path.join(cwd, 'LibreHardwareMonitor.config'),
+        path.join(__dirname, 'extras', 'LibreHardwareMonitor', 'LibreHardwareMonitor.config')
+      ];
+      const bundledCfg = bundledCfgCandidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+      const appData = process.env.APPDATA || (process.env.USERPROFILE && path.join(process.env.USERPROFILE, 'AppData', 'Roaming')) || '';
+      if (bundledCfg && appData) {
+        const targetDir = path.join(appData, 'LibreHardwareMonitor');
+        const targetCfg = path.join(targetDir, 'LibreHardwareMonitor.config');
+        try { fs.mkdirSync(targetDir, { recursive: true }); } catch {}
+        // Copy if missing or tiny (likely default)
+        let shouldCopy = false;
+        try { const st = fs.statSync(targetCfg); shouldCopy = !st || st.size < 1024; } catch { shouldCopy = true; }
+        if (shouldCopy) {
+          try { fs.copyFileSync(bundledCfg, targetCfg); } catch {}
+        }
+      }
+    } catch {}
     const start = (retrying) => {
       try {
         const child = spawn(exe, [], { stdio: 'ignore', windowsHide: true, cwd });

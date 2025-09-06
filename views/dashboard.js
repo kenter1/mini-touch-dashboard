@@ -4,7 +4,7 @@ exports.init = function init(ctx) {
   const { config } = ctx;
   const { parseStringPromise } = require('xml2js');
 
-  const UNIT = config.temperatureUnit === 'fahrenheit' ? '°F' : '°C';
+  const UNIT = config.temperatureUnit === 'fahrenheit' ? '°F' : '°C'; // for weather only
 
   let timers = [];
   const addTimer = (id) => { if (id) timers.push(id); };
@@ -141,9 +141,37 @@ exports.init = function init(ctx) {
         const s = sensors.find(s => regexArr.some(r => r.test(String(s.label||s.name||''))));
         return Number(s && s.value) || 0;
       };
+      // Prefer Glances CPU temp; fallback to LibreHardwareMonitor web JSON if enabled
       let cpuTempC = findSensor([/cpu|package|tctl|tdie/i]);
-      const tDisp = cpuTempC>0 ? Math.round(UNIT.includes('F') ? (cpuTempC * 9/5 + 32) : cpuTempC) : '-';
-      document.getElementById('cpuTemp').textContent = tDisp + (tDisp==='-' ? '' : UNIT);
+      if (!(cpuTempC > 0) && process.platform === 'win32') {
+        try {
+          const base = ((config.metrics && config.metrics.lhm && config.metrics.lhm.baseUrl) || 'http://localhost:8085').replace(/\/+$/,'');
+          const res = await fetch(base + '/data.json', { cache: 'no-store' });
+          if (res.ok) {
+            const j = await res.json();
+            let best = null; const seen = new Set();
+            (function scan(node){
+              if (!node || typeof node !== 'object' || seen.has(node)) return; seen.add(node);
+              const t = String(node.Text || node.text || node.Name || node.name || '').toLowerCase();
+              const ty = String(node.SensorType || node.Type || node.type || '').toLowerCase();
+              const v = node.Value !== undefined ? node.Value : node.value;
+              if ((ty === 'temperature' || /temp/.test(t))) {
+                const n = Number(typeof v === 'string' ? (v.match(/-?\d+(?:\.\d+)?/)||[0])[0] : v);
+                const isGpu = /(gpu|graphics|nvidia|radeon|amd)/.test(t);
+                const looksCpu = /(cpu|package|tctl|tdie)/.test(t) || (/core/.test(t) && !isGpu);
+                if (Number.isFinite(n) && looksCpu) best = Math.max(best ?? -Infinity, n);
+              }
+              Object.keys(node).forEach(k=>{ const vv=node[k]; if (vv && typeof vv === 'object' && vv!==node.parent) scan(vv); });
+              if (Array.isArray(node.Children)) node.Children.forEach(scan);
+              if (Array.isArray(node.Sensors)) node.Sensors.forEach(scan);
+            })(j);
+            if (best !== null && best !== -Infinity) cpuTempC = best;
+          }
+        } catch {}
+      }
+      // Always show CPU sensor temps in Celsius regardless of global setting
+      const tDisp = cpuTempC>0 ? Math.round(cpuTempC) : '-';
+      document.getElementById('cpuTemp').textContent = tDisp + (tDisp==='-' ? '' : '°C');
       const memTotal = Number(data?.mem?.total) || 0;
       const memUsedB = Number(data?.mem?.used) || 0;
       const memPct = memTotal ? Math.round((memUsedB/memTotal)*100) : 0;

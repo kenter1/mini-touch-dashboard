@@ -15,6 +15,9 @@
       "autoStart": true,
       "refreshSec": 5,
       "disablePlugins": []
+    },
+    "lhm": {
+      "autoStart": true
     }
   },
   "theme": "auto",

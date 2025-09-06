@@ -84,7 +84,17 @@
         "widgets": [
           {
             "type": "clock",
-            "span": 1
+            "span": 2
+          },
+          {
+            "type": "weather",
+            "span": 2,
+            "col": 4
+          },
+          {
+            "type": "feed",
+            "span": 1,
+            "col": 2
           }
         ]
       }

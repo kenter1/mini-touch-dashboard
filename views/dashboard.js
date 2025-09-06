@@ -314,6 +314,128 @@ exports.init = function init(ctx) {
         outline.style.pointerEvents = 'none';
         outline.style.boxSizing = 'border-box';
         card.appendChild(outline);
+        // Drag handle: allow dragging the entire card (ignore clicks on buttons/links)
+        card.style.cursor = 'move';
+        (function enableDrag() {
+          const pageRef = page; // same object
+          let dragState = null;
+          function buildOccExcludingSelf() {
+            const occ2 = occupied.map(row => row.slice());
+            for (let rr = startR; rr < startR + (rspan || rows); rr++) {
+              for (let cc = startC; cc < startC + span; cc++) {
+                if (rr >= 0 && rr < occ2.length && cc >= 0 && cc < occ2[0].length) occ2[rr][cc] = false;
+              }
+            }
+            return occ2;
+          }
+          function onDown(ev) {
+            // Ignore interactions on controls or interactive elements
+            const t = ev.target;
+            if ((t.closest && (t.closest('button') || t.closest('a'))) || t.getAttribute?.('contenteditable') === 'true') return;
+            ev.preventDefault(); ev.stopPropagation();
+            try { card.classList.add('dragging'); grid.classList.add('is-dragging'); } catch {}
+            const gridRect = grid.getBoundingClientRect();
+            const cs = getComputedStyle(grid);
+            const gap = parseFloat(cs.gap || cs.columnGap || '0') || 0;
+            const gw = grid.clientWidth;
+            const gh = grid.clientHeight;
+            const colW = cols > 0 ? (gw - gap * (cols - 1)) / cols : gw;
+            const rowH = rows > 0 ? (gh - gap * (rows - 1)) / rows : gh;
+            const occ2 = buildOccExcludingSelf();
+            const dragLayer = document.createElement('div');
+            dragLayer.style.position = 'absolute';
+            dragLayer.style.inset = '0';
+            dragLayer.style.zIndex = '200';
+            dragLayer.style.pointerEvents = 'auto';
+            const ghost = document.createElement('div');
+            ghost.style.position = 'absolute';
+            ghost.style.border = '2px solid rgba(77,163,255,0.8)';
+            ghost.style.background = 'rgba(77,163,255,0.15)';
+            ghost.style.borderRadius = '12px';
+            const ghostW = Math.round(span * colW + (span - 1) * gap);
+            const ghostH = Math.round((rspan || rows) * rowH + ((rspan || rows) - 1) * gap);
+            ghost.style.width = ghostW + 'px';
+            ghost.style.height = ghostH + 'px';
+            dragLayer.appendChild(ghost);
+            const hint = document.createElement('div');
+            hint.style.position = 'absolute';
+            hint.style.border = '2px dashed rgba(255,255,255,0.5)';
+            hint.style.borderRadius = '12px';
+            hint.style.pointerEvents = 'none';
+            dragLayer.appendChild(hint);
+            grid.appendChild(dragLayer);
+            const startMouse = { x: ev.clientX, y: ev.clientY };
+            const startPos = {
+              left: Math.round(gridRect.left + startC * (colW + gap)),
+              top: Math.round(gridRect.top + startR * (rowH + gap))
+            };
+            ghost.style.left = (startPos.left - gridRect.left) + 'px';
+            ghost.style.top = (startPos.top - gridRect.top) + 'px';
+            document.body.style.userSelect = 'none';
+            dragState = { gap, colW, rowH, gridRect, dragLayer, ghost, hint, occ2, drop: null };
+            window.addEventListener('mousemove', onMove, true);
+            window.addEventListener('mouseup', onUp, true);
+          }
+          function snapToCell(clientX, clientY, st) {
+            const x = clientX - st.gridRect.left;
+            const y = clientY - st.gridRect.top;
+            // Approximate index with gap compensation
+            const col = Math.max(0, Math.min(cols - 1, Math.floor((x + st.gap / 2) / (st.colW + st.gap))));
+            const row = Math.max(0, Math.min(rows - 1, Math.floor((y + st.gap / 2) / (st.rowH + st.gap))));
+            return { col, row };
+          }
+          function fitsAt(c, r, st) {
+            if (c < 0 || r < 0) return false;
+            if (c + span > cols) return false;
+            const rrspan = (rspan || rows);
+            if (r + rrspan > rows) return false;
+            for (let rr = r; rr < r + rrspan; rr++) {
+              for (let cc = c; cc < c + span; cc++) {
+                if (st.occ2[rr][cc]) return false;
+              }
+            }
+            return true;
+          }
+          function onMove(ev) {
+            if (!dragState) return;
+            ev.preventDefault(); ev.stopPropagation();
+            const st = dragState;
+            const snap = snapToCell(ev.clientX, ev.clientY, st);
+            const left = Math.round(snap.col * (st.colW + st.gap));
+            const top = Math.round(snap.row * (st.rowH + st.gap));
+            st.ghost.style.left = left + 'px';
+            st.ghost.style.top = top + 'px';
+            if (fitsAt(snap.col, snap.row, st)) {
+              st.hint.style.display = 'block';
+              st.hint.style.left = left + 'px';
+              st.hint.style.top = top + 'px';
+              st.hint.style.width = Math.round(span * st.colW + (span - 1) * st.gap) + 'px';
+              st.hint.style.height = Math.round((rspan || rows) * st.rowH + ((rspan || rows) - 1) * st.gap) + 'px';
+              st.drop = { c: snap.col, r: snap.row };
+            } else {
+              st.hint.style.display = 'none';
+              st.drop = null;
+            }
+          }
+          function onUp(ev) {
+            if (!dragState) return;
+            ev.preventDefault(); ev.stopPropagation();
+            const st = dragState;
+            window.removeEventListener('mousemove', onMove, true);
+            window.removeEventListener('mouseup', onUp, true);
+            try { st.dragLayer.remove(); } catch {}
+            document.body.style.userSelect = '';
+            try { card.classList.remove('dragging'); grid.classList.remove('is-dragging'); } catch {}
+            if (st.drop) {
+              w.col = st.drop.c;
+              w.row = st.drop.r;
+              saveConfig();
+              render();
+            }
+            dragState = null;
+          }
+          card.addEventListener('mousedown', onDown, true);
+        })();
                 // Floating controls (overlay)
         const ctrls = document.createElement('div');
         ctrls.style.position = 'absolute';

@@ -36,8 +36,8 @@
       "page": 0
     },
     {
-      "id": "system-1",
-      "type": "system",
+      "id": "dashboard-1",
+      "type": "dashboard",
       "label": "System",
       "icon": "🖥️",
       "page": 0
@@ -83,26 +83,24 @@
         "columns": 4,
         "widgets": [
           {
-            "type": "clock",
-            "span": 1
-          },
-          {
             "type": "weather",
             "span": 1,
-            "col": 4
+            "col": 1,
+            "rspan": 2,
+            "row": 0
+          },
+          {
+            "type": "system",
+            "span": 1,
+            "col": 3,
+            "row": 0,
+            "rspan": 1
           },
           {
             "type": "digital-clock",
             "span": 1,
-            "col": 1,
-            "rspan": 1,
-            "row": 0
-          },
-          {
-            "type": "clock",
-            "span": 1,
             "col": 2,
-            "row": 1,
+            "row": 0,
             "rspan": 1
           }
         ],

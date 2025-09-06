@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: http: 'unsafe-inline' 'unsafe-eval' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: http: 'unsafe-inline' 'unsafe-eval' data: file:; img-src 'self' https: http: data: file:;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Mini Touch Dashboard</title>
   <style>
@@ -177,12 +177,111 @@
     const si = { currentLoad: async()=>({ currentload: 0 }), mem: async()=>({ total: 1, available: 1, active: 0 }), cpuTemperature: async()=>({ main: 0 }), networkStats: async()=>([]) };
     const path = require('path');
     const fs = require('fs');
+    const { spawnSync } = require('child_process');
     // Safe DOM helpers (views are loaded dynamically)
     const $ = (id) => document.getElementById(id);
     function setText(id, text) { const el = $(id); if (el) el.textContent = text; }
     function setHTML(id, html) { const el = $(id); if (el) el.innerHTML = html; }
     function setWidth(id, val) { const el = $(id); if (el) el.style.width = val; }
     const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+
+    // Background application helper
+    function getWindowsWallpaperPath() {
+      try {
+        if (process.platform !== 'win32') return null;
+        // Try registry (works for static wallpapers)
+        try {
+          const res = spawnSync('reg', ['query', 'HKCU\\Control Panel\\Desktop', '/v', 'WallPaper'], { encoding: 'utf8', windowsHide: true });
+          const out = (res && res.stdout) ? String(res.stdout) : '';
+          const m = out.match(/WallPaper\s+REG_[^\s]+\s+(.+?)\s*$/mi);
+          const p = m && m[1] ? m[1].trim() : '';
+          if (p && fs.existsSync(p)) return p;
+        } catch {}
+        // Fallback to TranscodedWallpaper in Themes folder
+        const appData = process.env.APPDATA;
+        if (appData) {
+          const tPath = path.join(appData, 'Microsoft', 'Windows', 'Themes', 'TranscodedWallpaper');
+          if (fs.existsSync(tPath)) return tPath;
+          const cacheDir = path.join(appData, 'Microsoft', 'Windows', 'Themes', 'CachedFiles');
+          if (fs.existsSync(cacheDir)) {
+            const files = fs.readdirSync(cacheDir).filter(f => /\.(jpg|jpeg|png|bmp)$/i.test(f)).map(f => path.join(cacheDir, f));
+            let best = null; let bestSize = -1;
+            for (const f of files) { try { const st = fs.statSync(f); if (st.size > bestSize) { best = f; bestSize = st.size; } } catch {} }
+            if (best) return best;
+          }
+        }
+      } catch {}
+      return null;
+    }
+
+    window.applyBackground = function applyBackground(cfg) {
+      try {
+        const htmlEl = document.documentElement;
+        const bodyEl = document.body;
+        const bg = (cfg && cfg.background) || {};
+        const mode = bg.mode || 'solid';
+        const setSolid = (color) => {
+          const c = color || '#0b0f1a';
+          htmlEl.style.background = c;
+          bodyEl.style.background = c;
+          htmlEl.style.backgroundImage = '';
+          bodyEl.style.backgroundImage = '';
+          htmlEl.style.backgroundSize = '';
+          bodyEl.style.backgroundSize = '';
+          htmlEl.style.backgroundRepeat = '';
+          bodyEl.style.backgroundRepeat = '';
+          htmlEl.style.backgroundPosition = '';
+          bodyEl.style.backgroundPosition = '';
+          htmlEl.style.backgroundAttachment = '';
+          bodyEl.style.backgroundAttachment = '';
+        };
+        const setImage2 = (filePath) => {
+          if (!filePath || !fs.existsSync(filePath)) { setSolid(bg.color); return; }
+          const normalized = filePath.replace(/\\/g, '/');
+          const uri = 'file:///' + encodeURI(normalized.startsWith('/') ? normalized.slice(1) : normalized);
+          htmlEl.style.background = '#000';
+          bodyEl.style.background = '#000';
+          const val = `url("${uri}")`;
+          htmlEl.style.backgroundImage = val;
+          bodyEl.style.backgroundImage = val;
+          htmlEl.style.backgroundSize = 'cover';
+          bodyEl.style.backgroundSize = 'cover';
+          htmlEl.style.backgroundRepeat = 'no-repeat';
+          bodyEl.style.backgroundRepeat = 'no-repeat';
+          htmlEl.style.backgroundPosition = 'center center';
+          bodyEl.style.backgroundPosition = 'center center';
+          htmlEl.style.backgroundAttachment = 'fixed';
+          bodyEl.style.backgroundAttachment = 'fixed';
+        };
+        const setImage = (filePath) => {
+          if (!filePath || !fs.existsSync(filePath)) { setSolid(bg.color); return; }
+          const uri = 'file:///' + filePath.replace(/\\/g, '/').replace(/^\//, '');
+          const css = `url("${uri}") no-repeat center center fixed`;
+          htmlEl.style.background = '#000';
+          bodyEl.style.background = '#000';
+          htmlEl.style.backgroundImage = css;
+          bodyEl.style.backgroundImage = css;
+          htmlEl.style.backgroundSize = 'cover';
+          bodyEl.style.backgroundSize = 'cover';
+          htmlEl.style.backgroundRepeat = 'no-repeat';
+          bodyEl.style.backgroundRepeat = 'no-repeat';
+          htmlEl.style.backgroundPosition = 'center center';
+          bodyEl.style.backgroundPosition = 'center center';
+          htmlEl.style.backgroundAttachment = 'fixed';
+          bodyEl.style.backgroundAttachment = 'fixed';
+        };
+        if (mode === 'image') {
+          setImage2(bg.path);
+        } else if (mode === 'windows') {
+          const wp = getWindowsWallpaperPath();
+          if (wp) setImage2(wp); else setSolid(bg.color);
+        } else {
+          setSolid(bg.color);
+        }
+      } catch {}
+    };
+    // Apply on startup
+    try { window.applyBackground(config); } catch {}
 
     const UNIT = config.temperatureUnit === 'fahrenheit' ? 'Â°F' : 'Â°C';
 

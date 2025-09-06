@@ -86,8 +86,8 @@
             "type": "weather",
             "span": 1,
             "col": 0,
-            "rspan": 1,
-            "row": 1
+            "rspan": 2,
+            "row": 0
           },
           {
             "type": "system",
@@ -109,5 +109,8 @@
     ],
     "pageIndex": 0,
     "navEnabled": false
+  },
+  "background": {
+    "mode": "windows"
   }
 }

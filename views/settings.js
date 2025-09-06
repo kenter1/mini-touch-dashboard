@@ -20,6 +20,7 @@ exports.init = function init(ctx) {
     const dashboard = (config.dashboard = config.dashboard || {});
     const navEnabled = dashboard.navEnabled !== false; // default on
     const theme = config.theme || 'auto';
+    const bg = config.background || { mode: 'solid', color: '#0b0f1a' };
     generalBox.innerHTML = `
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; align-items:center;">
         <div>
@@ -45,6 +46,32 @@ exports.init = function init(ctx) {
             <span>Enable dashboard header (pages, edit, columns)</span>
           </label>
         </div>
+        <div>
+          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Background</div>
+          <select id="bgMode" style="width:100%; height:40px; font-size:16px; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12);">
+            <option value="solid" ${bg.mode==='solid'?'selected':''}>Solid Color</option>
+            <option value="image" ${bg.mode==='image'?'selected':''}>Image</option>
+            <option value="windows" ${bg.mode==='windows'?'selected':''}>Windows Wallpaper</option>
+          </select>
+        </div>
+        <div id="bgSolidWrap" style="${bg.mode==='solid'?'':'display:none;'}">
+          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Color</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="bgColor" type="color" value="${bg.color || '#0b0f1a'}" style="width:60px; height:40px; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0;">
+            <input id="bgColorText" type="text" value="${bg.color || '#0b0f1a'}" placeholder="#0b0f1a" style="flex:1; height:40px; font-size:16px; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+          </div>
+        </div>
+        <div id="bgImageWrap" style="${bg.mode==='image'?'':'display:none;'}">
+          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Image File</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="bgImagePath" type="text" value="${(bg.path||'').replace(/\\\\/g,'/')}" placeholder="C:/path/to/image.jpg" style="flex:1; height:40px; font-size:16px; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+            <button id="bgBrowse" class="small-btn">Choose</button>
+            <input id="bgFileInput" type="file" accept="image/*" style="display:none;" />
+          </div>
+        </div>
+        <div id="bgWinWrap" style="${bg.mode==='windows'?'':'display:none;'}">
+          <div class="sub">Uses your current Windows desktop wallpaper.</div>
+        </div>
       </div>
     `;
     generalBox.querySelector('#itemsDec').addEventListener('click', ()=>{
@@ -54,6 +81,30 @@ exports.init = function init(ctx) {
     generalBox.querySelector('#itemsInc').addEventListener('click', ()=>{
       const input = generalBox.querySelector('#itemsPerPage');
       input.value = Math.min(12, (parseInt(input.value,10)||1)+1);
+    });
+
+    // Background UI behavior
+    const modeSel = generalBox.querySelector('#bgMode');
+    const solidWrap = generalBox.querySelector('#bgSolidWrap');
+    const imageWrap = generalBox.querySelector('#bgImageWrap');
+    const winWrap = generalBox.querySelector('#bgWinWrap');
+    modeSel.addEventListener('change', ()=>{
+      const v = modeSel.value;
+      solidWrap.style.display = v==='solid'?'':'none';
+      imageWrap.style.display = v==='image'?'':'none';
+      winWrap.style.display = v==='windows'?'':'none';
+    });
+    const colorInput = generalBox.querySelector('#bgColor');
+    const colorText = generalBox.querySelector('#bgColorText');
+    colorInput.addEventListener('input', ()=>{ colorText.value = colorInput.value; });
+    colorText.addEventListener('input', ()=>{ colorInput.value = colorText.value; });
+    const fileBtn = generalBox.querySelector('#bgBrowse');
+    const fileInput = generalBox.querySelector('#bgFileInput');
+    const pathInput = generalBox.querySelector('#bgImagePath');
+    fileBtn.addEventListener('click', (e)=>{ e.preventDefault(); fileInput.click(); });
+    fileInput.addEventListener('change', ()=>{
+      const f = fileInput.files && fileInput.files[0];
+      if (f && f.path) { pathInput.value = f.path; }
     });
   }
 
@@ -172,6 +223,7 @@ exports.init = function init(ctx) {
       rebuildSidebar();
       renderGeneral();
       renderSettings();
+      try { window.applyBackground && window.applyBackground(config); } catch {}
     } catch (e) {
       alert('Failed to reload config.json');
     }
@@ -191,10 +243,29 @@ exports.init = function init(ctx) {
       const navEl = generalBox?.querySelector('#genDashNav');
       (config.dashboard = config.dashboard || {}).navEnabled = !!(navEl ? navEl.checked : true);
 
+      // background settings
+      const modeEl = generalBox?.querySelector('#bgMode');
+      const bgMode = modeEl?.value || 'solid';
+      const bg = (config.background = config.background || {});
+      bg.mode = bgMode;
+      if (bgMode === 'solid') {
+        const colEl = generalBox?.querySelector('#bgColorText');
+        bg.color = (colEl?.value || '#0b0f1a').trim();
+        delete bg.path;
+      } else if (bgMode === 'image') {
+        const pEl = generalBox?.querySelector('#bgImagePath');
+        bg.path = (pEl?.value || '').trim();
+        if (!bg.path) delete bg.path;
+        delete bg.color;
+      } else if (bgMode === 'windows') {
+        delete bg.color; delete bg.path;
+      }
+
       // collect apps
       config.apps = collectSettingsFromUI();
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
       rebuildSidebar();
+      try { window.applyBackground && window.applyBackground(config); } catch {}
       alert('Saved');
     } catch (e) {
       alert('Failed to save: ' + e.message);

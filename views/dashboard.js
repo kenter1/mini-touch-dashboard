@@ -1,240 +1,378 @@
-// Dashboard view module: clock + weather + system + feeds
-
+// Dashboard: configurable widget grid with pages/slots
 exports.init = function init(ctx) {
   const { config } = ctx;
+  const path = require('path');
+  const fs = require('fs');
   const { parseStringPromise } = require('xml2js');
+  const si = require('systeminformation');
+  const DEG = '\u00B0';
 
-  const UNIT = config.temperatureUnit === 'fahrenheit' ? '°F' : '°C'; // for weather only
-
+  // State and defaults
   let timers = [];
   const addTimer = (id) => { if (id) timers.push(id); };
+  function clearTimers() { try { timers.forEach(clearInterval); } catch {} timers = []; }
+  let editMode = false;
+  const dash = (config.dashboard = config.dashboard || {});
+  dash.pages = Array.isArray(dash.pages) && dash.pages.length ? dash.pages : [
+    { columns: 3, widgets: [ { type:'clock', span: 1 }, { type:'weather', span: 1 }, { type:'system', span: 1 } ] }
+  ];
+  let pageIndex = Math.max(0, Math.min((dash.pageIndex|0)||0, dash.pages.length-1));
 
-  function formatBitsPerSec(bps) {
-    const units = ['bps','Kbps','Mbps','Gbps'];
-    let i = 0; let val = bps;
-    while (val >= 1000 && i < units.length - 1) { val /= 1000; i++; }
-    return val.toFixed(1) + ' ' + units[i];
+  function saveConfig() {
+    try { fs.writeFileSync(path.join(__dirname, '..', 'config.json'), JSON.stringify(config, null, 2)); } catch {}
   }
 
-  // Clock
-  function tickClock() {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2,'0');
-    const mm = String(now.getMinutes()).padStart(2,'0');
-    const clock = document.getElementById('clock');
-    const date = document.getElementById('date');
-    if (clock) clock.textContent = `${hh}:${mm}`;
-    if (date) date.textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
-  }
-  tickClock(); addTimer(setInterval(tickClock, 1000));
+  // Helpers
+  function formatBps(bps) { const units=['bps','Kbps','Mbps','Gbps']; let i=0, v=Math.max(0,bps); while(v>=1000&&i<units.length-1){v/=1000;i++;} return v.toFixed(1)+' '+units[i]; }
 
-  // Weather
-  async function loadWeather() {
-    const lat = config.latitude, lon = config.longitude;
-    const tempUnit = config.temperatureUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius';
-    const windUnit = config.windSpeedUnit === 'mph' ? 'mph' : 'kmh';
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&hourly=temperature_2m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
-    const loc = document.getElementById('locationPill');
-    if (loc) loc.textContent = `Loc: ${lat.toFixed(3)}, ${lon.toFixed(3)}`;
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      const cur = data.current;
-      const ct = document.getElementById('currentTemp');
-      const ws = document.getElementById('weatherSummary');
-      if (ct) ct.textContent = Math.round(cur.temperature_2m) + (tempUnit === 'fahrenheit' ? '°F' : '°C');
-      if (ws) ws.textContent = `Wind ${Math.round(cur.wind_speed_10m)} ${windUnit.toUpperCase()}`;
-      const idxNow = data.hourly.time.findIndex(t => new Date(t).getTime() >= Date.now());
-      const grid = document.getElementById('weatherGrid');
-      if (grid) {
-        grid.innerHTML = '';
-        for (let i = 0; i < 8; i++) {
-          const idx = idxNow + i;
-          if (idx >= data.hourly.time.length) break;
-          const t = new Date(data.hourly.time[idx]);
-          const temp = Math.round(data.hourly.temperature_2m[idx]);
-          const el = document.createElement('div');
-          el.className = 'weather-item';
-          el.innerHTML = `<div class="sub">${t.getHours()}:00</div><div class="big" style="font-size:28px">${temp}°</div>`;
-          grid.appendChild(el);
+  // Widget registry
+  const widgets = {
+    clock: {
+      title: 'Clock',
+      render(container) {
+        container.innerHTML = `<div class="row" style="justify-content: space-between; align-items: end;">
+          <div><div class="title">Now</div><div class="time" id="dashClock">--:--</div><div class="sub" id="dashDate">-</div></div>
+          <div style="text-align:right;"><div class="sub">Mini Touch Dashboard</div></div>
+        </div>`;
+        function tick() {
+          const now = new Date();
+          const hh = String(now.getHours()).padStart(2,'0');
+          const mm = String(now.getMinutes()).padStart(2,'0');
+          const clock = container.querySelector('#dashClock');
+          const date = container.querySelector('#dashDate');
+          if (clock) clock.textContent = `${hh}:${mm}`;
+          if (date) date.textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
         }
+        tick(); addTimer(setInterval(tick, 1000));
       }
-    } catch (e) {
-      const ws = document.getElementById('weatherSummary');
-      if (ws) ws.textContent = 'Weather unavailable';
-    }
-  }
-  loadWeather(); addTimer(setInterval(loadWeather, (config.refresh && config.refresh.weatherMs) || 10*60*1000));
-
-  // System metrics (Glances + optional NVIDIA via nvidia-smi)
-  const { execFile } = require('child_process');
-  function execFileSafe(cmd, args, options) {
-    return new Promise((resolve) => {
-      const child = execFile(cmd, args, { timeout: 1500, windowsHide: true, ...options }, (err, stdout) => {
-        if (err) return resolve(null);
-        resolve(String(stdout || ''));
-      });
-      child.on('error', () => resolve(null));
-    });
-  }
-  async function getNvidiaGpu() {
-    const args = ['--query-gpu=utilization.gpu,temperature.gpu', '--format=csv,noheader,nounits'];
-    let out = await execFileSafe('nvidia-smi', args);
-    if (!out && process.platform === 'win32') {
-      // Fallback to default Windows install path
-      out = await execFileSafe('C\\\x3a\\Program Files\\NVIDIA Corporation\\NVSMI\\nvidia-smi.exe', args);
-    }
-    if (!out) return null;
-    try {
-      const lines = out.trim().split(/\r?\n/).filter(Boolean);
-      if (!lines.length) return null;
-      let maxUtil = 0; let maxTemp = 0;
-      for (const line of lines) {
-        const parts = line.split(/\s*,\s*/);
-        const util = Number(parts[0]) || 0;
-        const temp = Number(parts[1]) || 0;
-        if (util > maxUtil) maxUtil = util;
-        if (temp > maxTemp) maxTemp = temp;
-      }
-      return { util: Math.max(0, Math.min(100, maxUtil)), temp: maxTemp };
-    } catch { return null; }
-  }
-  async function sampleMetrics() {
-    try {
-      const api = (config.metrics && config.metrics.api) || {};
-      let bases = [];
-      try {
-        const u = new URL(String(api.baseUrl || 'http://127.0.0.1:61208'));
-        const base = `${u.protocol}//${u.host}`.replace(/\/+$/,'');
-        bases.push(base);
-        if (/^localhost(?::|$)/i.test(u.host)) {
-          const port = u.port ? `:${u.port}` : '';
-          bases.push(`${u.protocol}//127.0.0.1${port}`);
-        }
-      } catch {
-        bases = [String(api.baseUrl || 'http://127.0.0.1:61208').replace(/\/+$/,'')];
-      }
-      const paths = ['/api/4/all','/api/3/all'];
-      let data = null;
-      outer: for (const b of bases) {
-        for (const p of paths) {
+    },
+    weather: {
+      title: 'Weather',
+      render(container) {
+        container.innerHTML = `<div class="title">Weather</div><div class="big" id="wCur">-</div><div class="sub" id="wSum">-</div><div class="weather-grid" id="wGrid"></div>`;
+        async function load() {
+          const lat = config.latitude, lon = config.longitude;
+          const tempUnit = config.temperatureUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius';
+          const windUnit = config.windSpeedUnit === 'mph' ? 'mph' : 'kmh';
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&hourly=temperature_2m&temperature_unit=${tempUnit}&wind_speed_unit=${windUnit}&timezone=auto`;
           try {
-            const res = await fetch(`${b}${p}`);
-            if (!res.ok) continue;
-            data = await res.json();
-            if (data) break outer;
+            const res = await fetch(url);
+            const data = await res.json();
+            const cur = data.current;
+            const ct = container.querySelector('#wCur');
+            const ws = container.querySelector('#wSum');
+            if (ct) ct.textContent = Math.round(cur.temperature_2m) + (tempUnit === 'fahrenheit' ? DEG+'F' : DEG+'C');
+            if (ws) ws.textContent = `Wind ${Math.round(cur.wind_speed_10m)} ${windUnit.toUpperCase()}`;
+            const idxNow = data.hourly.time.findIndex(t => new Date(t).getTime() >= Date.now());
+            const grid = container.querySelector('#wGrid');
+            if (grid) {
+              grid.innerHTML = '';
+              for (let i = 0; i < 8; i++) {
+                const idx = idxNow + i; if (idx >= data.hourly.time.length) break;
+                const t = new Date(data.hourly.time[idx]);
+                const temp = Math.round(data.hourly.temperature_2m[idx]);
+                const el = document.createElement('div');
+                el.className = 'weather-item';
+                el.innerHTML = `<div class="sub">${t.getHours()}:00</div><div class="big" style="font-size:28px">${temp}${DEG}</div>`;
+                grid.appendChild(el);
+              }
+            }
           } catch {}
         }
+        load(); addTimer(setInterval(load, (config.refresh && config.refresh.weatherMs) || 600000));
       }
-      if (!data) {
-        const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
-        const setW = (id,val)=>{ const el=document.getElementById(id); if(el) el.style.width=val; };
-        set('cpuLoad','-%'); setW('cpuBar','0%'); set('cpuTemp','-');
-        set('memUsed','-'); setW('memBar','0%'); set('netDown','-'); set('netUp','-');
-        return;
-      }
-      const cpu = Math.round(Number(data?.cpu?.total) || 0);
-      document.getElementById('cpuLoad').textContent = cpu + '%';
-      document.getElementById('cpuBar').style.width = Math.min(cpu,100) + '%';
-      const sensors = Array.isArray(data?.sensors) ? data.sensors : [];
-      const findSensor = (regexArr) => {
-        const s = sensors.find(s => regexArr.some(r => r.test(String(s.label||s.name||''))));
-        return Number(s && s.value) || 0;
-      };
-      // Prefer Glances CPU temp; fallback to LibreHardwareMonitor web JSON if enabled
-      let cpuTempC = findSensor([/cpu|package|tctl|tdie/i]);
-      if (!(cpuTempC > 0) && process.platform === 'win32') {
-        try {
-          const base = ((config.metrics && config.metrics.lhm && config.metrics.lhm.baseUrl) || 'http://localhost:8085').replace(/\/+$/,'');
-          const res = await fetch(base + '/data.json', { cache: 'no-store' });
-          if (res.ok) {
-            const j = await res.json();
-            let best = null; const seen = new Set();
-            (function scan(node){
-              if (!node || typeof node !== 'object' || seen.has(node)) return; seen.add(node);
-              const t = String(node.Text || node.text || node.Name || node.name || '').toLowerCase();
-              const ty = String(node.SensorType || node.Type || node.type || '').toLowerCase();
-              const v = node.Value !== undefined ? node.Value : node.value;
-              if ((ty === 'temperature' || /temp/.test(t))) {
-                const n = Number(typeof v === 'string' ? (v.match(/-?\d+(?:\.\d+)?/)||[0])[0] : v);
-                const isGpu = /(gpu|graphics|nvidia|radeon|amd)/.test(t);
-                const looksCpu = /(cpu|package|tctl|tdie)/.test(t) || (/core/.test(t) && !isGpu);
-                if (Number.isFinite(n) && looksCpu) best = Math.max(best ?? -Infinity, n);
-              }
-              Object.keys(node).forEach(k=>{ const vv=node[k]; if (vv && typeof vv === 'object' && vv!==node.parent) scan(vv); });
-              if (Array.isArray(node.Children)) node.Children.forEach(scan);
-              if (Array.isArray(node.Sensors)) node.Sensors.forEach(scan);
-            })(j);
-            if (best !== null && best !== -Infinity) cpuTempC = best;
-          }
-        } catch {}
-      }
-      // Always show CPU sensor temps in Celsius regardless of global setting
-      const tDisp = cpuTempC>0 ? Math.round(cpuTempC) : '-';
-      document.getElementById('cpuTemp').textContent = tDisp + (tDisp==='-' ? '' : '°C');
-      const memTotal = Number(data?.mem?.total) || 0;
-      const memUsedB = Number(data?.mem?.used) || 0;
-      const memPct = memTotal ? Math.round((memUsedB/memTotal)*100) : 0;
-      document.getElementById('memUsed').textContent = `${(memUsedB/(1024**3)).toFixed(1)} / ${(memTotal/(1024**3)).toFixed(1)} GB`;
-      document.getElementById('memBar').style.width = Math.min(memPct,100) + '%';
-      const netArr = Array.isArray(data?.network) ? data.network : [];
-      if (netArr.length) {
-        const rx = netArr.reduce((a,n)=>a + (Number(n.rx)||0), 0) * 8;
-        const tx = netArr.reduce((a,n)=>a + (Number(n.tx)||0), 0) * 8;
-        document.getElementById('netDown').textContent = formatBitsPerSec(Math.max(0, rx));
-        document.getElementById('netUp').textContent = formatBitsPerSec(Math.max(0, tx));
-      }
-
-      // Optional NVIDIA GPU utilization via nvidia-smi (does not use PowerShell/WMI)
-      try {
-        const gpu = await getNvidiaGpu();
-        if (gpu) {
-          const util = Math.round(gpu.util);
-          const el = document.getElementById('gpuLoad');
-          const bar = document.getElementById('gpuBar');
-          if (el) el.textContent = util + '%';
-          if (bar) bar.style.width = Math.min(util, 100) + '%';
+    },
+    system: {
+      title: 'System',
+      render(container) {
+        container.innerHTML = `<div class="title">System</div>
+        <div class="row">
+          <div class="kpi"><div class="label">CPU</div><div class="val" id="dCpu">-%</div><div class="progress"><div id="dCpuBar"></div></div></div>
+          <div class="kpi"><div class="label">CPU Temp</div><div class="val" id="dCpuT">-</div></div>
+          <div class="kpi"><div class="label">Memory</div><div class="val" id="dMem">-</div><div class="progress"><div id="dMemBar"></div></div></div>
+          <div class="kpi"><div class="label">Net Down</div><div class="val" id="dDown">-</div></div>
+          <div class="kpi"><div class="label">Net Up</div><div class="val" id="dUp">-</div></div>
+        </div>`;
+        let lastRx = 0, lastTx = 0, lastTime = 0;
+        async function poll() {
+          try {
+            const [load, mem, temp, net] = await Promise.all([
+              si.currentLoad(), si.mem(), si.cpuTemperature(), si.networkStats()
+            ]);
+            const cpu = Math.round(Number(load.currentload) || 0);
+            const dCpu = container.querySelector('#dCpu'); if (dCpu) dCpu.textContent = cpu + '%';
+            const dCpuBar = container.querySelector('#dCpuBar'); if (dCpuBar) dCpuBar.style.width = Math.min(100, cpu) + '%';
+            const t = temp.main && temp.main > 0 ? Math.round(temp.main) : 0;
+            const dCpuT = container.querySelector('#dCpuT'); if (dCpuT) dCpuT.textContent = (t>0 ? t + DEG + 'C' : '-');
+            const used = mem.active || (mem.total - mem.available);
+            const memPct = Math.round((used / mem.total) * 100);
+            const dMem = container.querySelector('#dMem'); if (dMem) dMem.textContent = `${(used/(1024**3)).toFixed(1)} / ${(mem.total/(1024**3)).toFixed(1)} GB`;
+            const dMemBar = container.querySelector('#dMemBar'); if (dMemBar) dMemBar.style.width = Math.min(100, memPct) + '%';
+            const rx = net.reduce((a,n)=>a+n.rx_bytes,0);
+            const tx = net.reduce((a,n)=>a+n.tx_bytes,0);
+            const now = Date.now();
+            if (lastTime) {
+              const dt = (now - lastTime) / 1000;
+              const downBps = (rx - lastRx) * 8 / dt;
+              const upBps = (tx - lastTx) * 8 / dt;
+              const dDown = container.querySelector('#dDown'); if (dDown) dDown.textContent = formatBps(downBps);
+              const dUp = container.querySelector('#dUp'); if (dUp) dUp.textContent = formatBps(upBps);
+            }
+            lastRx = rx; lastTx = tx; lastTime = now;
+          } catch {}
         }
-      } catch {}
-    } catch {}
-  }
-  sampleMetrics(); addTimer(setInterval(sampleMetrics, (config.refresh && config.refresh.metricsMsApi) || 2000));
-
-  // RSS feed
-  async function loadFeeds() {
-    const list = document.getElementById('feedList');
-    if (!list) return;
-    list.innerHTML = '';
-    for (const feedUrl of (config.rssFeeds || [])) {
-      try {
-        const res = await fetch(feedUrl);
-        const xml = await res.text();
-        const parsed = await parseStringPromise(xml, { explicitArray: false });
-        const items = (parsed.rss && parsed.rss.channel && parsed.rss.channel.item)
-          ? parsed.rss.channel.item
-          : (parsed.feed && parsed.feed.entry) ? parsed.feed.entry : [];
-        const arr = Array.isArray(items) ? items.slice(0, 5) : [items];
-        arr.filter(Boolean).forEach(item => {
-          const title = item.title && (item.title._ || item.title) || 'Untitled';
-          const link = item.link && (item.link.href || item.link[0] || item.link) || '#';
-          const div = document.createElement('div');
-          div.className = 'feed-item';
-          div.innerHTML = `<a href="${link}" onclick="require('electron').shell.openExternal('${link}'); return false;">${title}</a>`;
-          list.appendChild(div);
-        });
-      } catch (e) {
-        const div = document.createElement('div');
-        div.className = 'feed-item';
-        div.textContent = `Failed to load: ${feedUrl}`;
-        list.appendChild(div);
+        poll(); addTimer(setInterval(poll, (config.refresh && config.refresh.metricsMs) || 1500));
+      }
+    },
+    feed: {
+      title: 'Feed',
+      render(container) {
+        container.innerHTML = `<div class="title">Feed</div><div class="feed" id="dFeed"></div>`;
+        async function loadFeeds() {
+          const list = container.querySelector('#dFeed'); if (!list) return;
+          list.innerHTML = '';
+          for (const feedUrl of (config.rssFeeds || [])) {
+            try {
+              const res = await fetch(feedUrl);
+              const xml = await res.text();
+              const parsed = await parseStringPromise(xml, { explicitArray: false });
+              const items = (parsed.rss && parsed.rss.channel && parsed.rss.channel.item)
+                ? parsed.rss.channel.item
+                : (parsed.feed && parsed.feed.entry) ? parsed.feed.entry : [];
+              const arr = Array.isArray(items) ? items.slice(0, 5) : [items];
+              arr.filter(Boolean).forEach(item => {
+                const title = item.title && (item.title._ || item.title) || 'Untitled';
+                const link = item.link && (item.link.href || item.link[0] || item.link) || '#';
+                const div = document.createElement('div');
+                div.className = 'feed-item';
+                div.innerHTML = `<a href="${link}" onclick="require('electron').shell.openExternal('${link}'); return false;">${title}</a>`;
+                list.appendChild(div);
+              });
+            } catch (e) {
+              const div = document.createElement('div');
+              div.className = 'feed-item';
+              div.textContent = `Failed to load: ${feedUrl}`;
+              list.appendChild(div);
+            }
+          }
+        }
+        loadFeeds(); addTimer(setInterval(loadFeeds, (config.refresh && config.refresh.rssMs) || 600000));
       }
     }
-  }
-  loadFeeds(); addTimer(setInterval(loadFeeds, (config.refresh && config.refresh.rssMs) || 10*60*1000));
-
-  // Expose destroy to clear timers when leaving view
-  exports.destroy = function destroy() {
-    timers.forEach(clearInterval);
-    timers = [];
   };
+
+  function render() {
+    clearTimers();
+    const grid = document.getElementById('dashGrid'); if (!grid) return;
+    const page = dash.pages[pageIndex] || { columns: 3, widgets: [] };
+    const cols = Math.max(1, Math.min(6, Number(page.columns) || 3));
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.innerHTML = '';
+
+    // Header controls
+    const pageLabel = document.getElementById('dashPageLabel'); if (pageLabel) pageLabel.textContent = `Page ${pageIndex+1} / ${dash.pages.length}`;
+    const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
+    const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
+
+    // When editing, draw slot outlines across the row without affecting layout (and enable clicking empty slots)
+    if (editMode) {
+      const overlay = document.createElement('div');
+      overlay.style.position = 'absolute';
+      overlay.style.inset = '0';
+      overlay.style.zIndex = '1000';
+      // Let underlying widgets receive clicks; we'll attach clickable plus boxes separately
+      overlay.style.pointerEvents = 'none';
+      grid.appendChild(overlay);
+      const cs = getComputedStyle(grid);
+      const gap = parseFloat(cs.gap || cs.columnGap || '0') || 0;
+      const gw = grid.clientWidth;
+      const gh = grid.clientHeight;
+      const colW = cols > 0 ? (gw - gap * (cols - 1)) / cols : gw;
+      // Build map of current widgets positions in first row
+      const visible = (page.widgets || []).slice(0, cols);
+      const positions = [];
+      let usedCols = 0;
+      for (let j = 0; j < visible.length; j++) {
+        const w = visible[j];
+        const span = Math.max(1, Math.min(cols - usedCols, Number(w.span)||1));
+        positions.push({ index: j, start: usedCols, end: usedCols + span });
+        usedCols += span;
+        if (usedCols >= cols) break;
+      }
+      for (let i = 0; i < cols; i++) {
+        if (i >= usedCols) {
+          const slot = document.createElement('div');
+          slot.className = 'slot-outline slot-empty';
+          slot.style.position = 'absolute';
+          slot.style.top = '0px';
+          slot.style.height = gh + 'px';
+          slot.style.left = Math.round(i * (colW + gap)) + 'px';
+          slot.style.width = Math.max(0, Math.floor(colW)) + 'px';
+          slot.style.pointerEvents = 'auto';
+          slot.style.cursor = 'pointer';
+          slot.title = 'Click to add a widget';
+          slot.textContent = '+';
+          slot.onclick = (ev) => {
+            ev.stopPropagation();
+            // Inline picker inside this slot to avoid positioning issues
+            try { document.getElementById('widgetPicker')?.remove(); } catch {}
+            const panel = document.createElement('div');
+            panel.id = 'widgetPicker';
+            panel.style.position = 'absolute';
+            panel.style.inset = '12px';
+            panel.style.display = 'flex';
+            panel.style.flexDirection = 'column';
+            panel.style.gap = '8px';
+            panel.style.alignItems = 'stretch';
+            panel.style.justifyContent = 'center';
+            panel.style.background = 'var(--card)';
+            panel.style.border = '1px solid rgba(255,255,255,0.15)';
+            panel.style.borderRadius = '10px';
+            panel.style.boxShadow = '0 10px 30px rgba(0,0,0,0.35)';
+            const types = Object.keys(widgets);
+            types.forEach(t => {
+              const btn = document.createElement('button');
+              btn.className = 'small-btn';
+              btn.textContent = `Add ${t}`;
+              btn.onclick = (e2) => {
+                e2.stopPropagation();
+                const arr = (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []);
+                const targetPos = positions.find(p => p.start >= i);
+                const insertIndexVisible = targetPos ? targetPos.index : visible.length;
+                const insertIndex = Math.min(arr.length, insertIndexVisible);
+                arr.splice(insertIndex, 0, { type: t, span: 1 });
+                saveConfig();
+                render();
+              };
+              panel.appendChild(btn);
+            });
+            // Cancel button
+            const cancel = document.createElement('button');
+            cancel.className = 'small-btn';
+            cancel.textContent = 'Cancel';
+            cancel.onclick = (e3) => { e3.stopPropagation(); try { panel.remove(); } catch {} };
+            panel.appendChild(cancel);
+            slot.appendChild(panel);
+          };
+          overlay.appendChild(slot);
+        }
+      }
+    }
+
+    // Ensure one horizontal row: show up to `cols` widgets side-by-side
+    (page.widgets || []).slice(0, cols).forEach((w, idx) => {
+      const def = widgets[w.type];
+      const span = Math.max(1, Math.min(cols, Number(w.span)||1));
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.gridColumn = `span ${span}`;
+      card.style.gridRow = '1';
+      if (editMode) {
+        // Overlay outline (non-blocking)
+        card.style.position = 'relative';
+        const outline = document.createElement('div');
+        outline.style.position = 'absolute';
+        outline.style.inset = '0';
+        outline.style.border = '2px dashed rgba(77,163,255,0.45)';
+        outline.style.borderRadius = '12px';
+        outline.style.pointerEvents = 'none';
+        outline.style.boxSizing = 'border-box';
+        card.appendChild(outline);
+        // Floating controls (overlay)
+        const ctrls = document.createElement('div');
+        ctrls.style.position = 'absolute';
+        ctrls.style.top = '6px';
+        ctrls.style.right = '6px';
+        ctrls.style.display = 'flex';
+        ctrls.style.gap = '6px';
+        ctrls.style.background = 'rgba(0,0,0,0.35)';
+        ctrls.style.backdropFilter = 'blur(4px)';
+        ctrls.style.padding = '4px 6px';
+        ctrls.style.borderRadius = '8px';
+        ctrls.style.pointerEvents = 'auto';
+        const mkBtn = (label, title) => { const b = document.createElement('button'); b.className='small-btn'; b.textContent=label; b.title=title; b.style.padding='4px 8px'; b.style.lineHeight='1'; return b; };
+        const dec = mkBtn('−','Narrower');
+        const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span;
+        const inc = mkBtn('+','Wider');
+        const del = mkBtn('✕','Remove');
+        dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, span - 1); saveConfig(); render(); };
+        inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, span + 1); saveConfig(); render(); };
+        del.onclick = (e) => { e.stopPropagation(); page.widgets.splice(idx,1); saveConfig(); render(); };
+        ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc); ctrls.appendChild(del);
+        card.appendChild(ctrls);
+      }
+      const body = document.createElement('div');
+      card.appendChild(body);
+      grid.appendChild(card);
+      if (def && typeof def.render === 'function') def.render(body); else body.textContent = `Unknown widget: ${w.type}`;
+    });
+  }
+
+  // Wire controls
+  const prevBtn = document.getElementById('dashPrevPage'); if (prevBtn) prevBtn.onclick = () => { pageIndex = (pageIndex - 1 + dash.pages.length) % dash.pages.length; dash.pageIndex = pageIndex; saveConfig(); render(); };
+  const nextBtn = document.getElementById('dashNextPage'); if (nextBtn) nextBtn.onclick = () => { pageIndex = (pageIndex + 1) % dash.pages.length; dash.pageIndex = pageIndex; saveConfig(); render(); };
+  const colsDec = document.getElementById('dashColsDec'); if (colsDec) colsDec.onclick = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); };
+  const colsInc = document.getElementById('dashColsInc'); if (colsInc) colsInc.onclick = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
+  const toggleEdit = document.getElementById('dashToggleEdit'); if (toggleEdit) toggleEdit.onclick = () => { editMode = !editMode; render(); };
+  function showWidgetPicker(anchorEl, onChoose) {
+    try { document.getElementById('widgetPicker')?.remove(); } catch {}
+    const types = Object.keys(widgets);
+    const picker = document.createElement('div');
+    picker.id = 'widgetPicker';
+    picker.style.position = 'fixed';
+    picker.style.zIndex = '2000';
+    picker.style.background = 'var(--card)';
+    picker.style.border = '1px solid rgba(255,255,255,0.15)';
+    picker.style.borderRadius = '10px';
+    picker.style.boxShadow = '0 10px 30px rgba(0,0,0,0.35)';
+    picker.style.padding = '8px';
+    picker.style.display = 'flex';
+    picker.style.gap = '6px';
+    types.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'small-btn';
+      btn.textContent = t;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        if (typeof onChoose === 'function') {
+          onChoose(t);
+        } else {
+          (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []).push({ type: t, span: 1 });
+          saveConfig();
+        }
+        picker.remove();
+        render();
+      };
+      picker.appendChild(btn);
+    });
+    document.body.appendChild(picker);
+    const rect = anchorEl.getBoundingClientRect();
+    picker.style.top = Math.round(rect.bottom + 6) + 'px';
+    picker.style.left = Math.round(rect.left) + 'px';
+    const off = (ev) => { if (!picker.contains(ev.target)) { try { picker.remove(); } catch {} document.removeEventListener('mousedown', off, true); } };
+    setTimeout(() => document.addEventListener('mousedown', off, true), 0);
+  }
+  function addWidgetFlow(anchorEl, onChoose) {
+    try {
+      if (typeof prompt === 'function') {
+        const types = Object.keys(widgets);
+        const choice = prompt(`Add widget type: ${types.join(', ')}`, 'clock');
+        if (choice && widgets[choice]) {
+          if (typeof onChoose === 'function') { onChoose(choice); } else {
+            (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []).push({ type: choice, span: 1 });
+            saveConfig(); render();
+          }
+          return;
+        }
+      }
+    } catch {}
+    showWidgetPicker(anchorEl, onChoose);
+  }
+  const addWidget = document.getElementById('dashAddWidget'); if (addWidget) addWidget.onclick = (e) => {
+    addWidgetFlow(addWidget);
+  };
+
+  render();
+
+  exports.destroy = function destroy() { clearTimers(); };
 };

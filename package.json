@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electronmon .",
+    "dev": "electronmon . --ignore \"**/config.json\"",
     "build": "electron-builder",
     "build:win": "electron-builder --win nsis",
     "build:win:portable": "electron-builder --win portable",

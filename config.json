@@ -76,5 +76,23 @@
   ],
   "sidebar": {
     "itemsPerPage": 5
+  },
+  "dashboard": {
+    "pages": [
+      {
+        "columns": 3,
+        "widgets": [
+          {
+            "type": "weather",
+            "span": 1
+          },
+          {
+            "type": "clock",
+            "span": 1
+          }
+        ]
+      }
+    ],
+    "pageIndex": 0
   }
 }

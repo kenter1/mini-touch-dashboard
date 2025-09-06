@@ -1,62 +1,38 @@
-<div class="grid">
-  <div class="card wide" id="clockCard">
-    <div class="row" style="justify-content: space-between; align-items: end;">
-      <div>
-        <div class="title">Now</div>
-        <div class="time" id="clock">--:--</div>
-        <div class="sub" id="date">-</div>
-      </div>
-      <div style="text-align:right;">
-        <div class="pill" id="locationPill">Loc: -</div>
-        <div class="sub">Mini Touch Dashboard</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" id="weatherCard">
-    <div class="title">Weather</div>
-    <div class="big" id="currentTemp">-</div>
-    <div class="sub" id="weatherSummary">-</div>
-    <div class="weather-grid" id="weatherGrid"></div>
-  </div>
-
-  <div class="card" id="systemCard">
-    <div class="title">System</div>
-    <div class="row">
-      <div class="kpi">
-        <div class="label">CPU</div>
-        <div class="val" id="cpuLoad">-%</div>
-        <div class="progress"><div id="cpuBar"></div></div>
-      </div>
-      <div class="kpi">
-        <div class="label">CPU Temp</div>
-        <div class="val" id="cpuTemp">-</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Memory</div>
-        <div class="val" id="memUsed">-</div>
-        <div class="progress"><div id="memBar"></div></div>
-      </div>
-      <div class="kpi">
-        <div class="label">GPU</div>
-        <div class="val" id="gpuLoad">-%</div>
-        <div class="progress"><div id="gpuBar"></div></div>
+<style>
+  .dashboard-wrap { display:flex; flex-direction:column; height:100%; min-height:0; }
+  #dashGrid { flex:1; min-height: 0; grid-template-rows: 1fr; position: relative; }
+  #dashGrid .card { height: 100%; }
+  /* Show slot boxes during edit mode */
+  #dashGrid .slot-outline {
+    border: 2px dashed rgba(255,255,255,0.18);
+    border-radius: 12px;
+    height: 100%;
+  }
+  #dashGrid .slot-outline.slot-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    line-height: 1;
+    color: rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.03);
+  }
+</style>
+<div class="dashboard-wrap">
+  <div class="card" style="margin-bottom: 8px;">
+    <div class="row" style="align-items:center; justify-content:space-between;">
+      <div class="title">Dashboard</div>
+      <div class="row" id="dashControls" style="gap:8px;">
+        <div style="width:12px;"></div>
+        <button class="small-btn" id="dashColsDec">- Col</button>
+        <div class="pill" id="dashColsLabel">3 cols</div>
+        <button class="small-btn" id="dashColsInc">+ Col</button>
+        <div style="width:12px;"></div>
+        <button class="small-btn" id="dashToggleEdit">Edit: Off</button>
       </div>
     </div>
-    <div class="row" style="margin-top:8px;">
-      <div class="kpi">
-        <div class="label">Net Down</div>
-        <div class="val" id="netDown">-</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Net Up</div>
-        <div class="val" id="netUp">-</div>
-      </div>
+    <div class="sub">Configure pages and widgets. Changes are saved to config.json.</div>
     </div>
-  </div>
 
-  <div class="card" id="feedCard">
-    <div class="title">Feed</div>
-    <div class="feed" id="feedList"></div>
-  </div>
+  <div id="dashGrid" class="grid"></div>
 </div>

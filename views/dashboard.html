@@ -1,7 +1,8 @@
-<style>
+﻿<style>
   .dashboard-wrap { display:flex; flex-direction:column; height:100%; min-height:0; }
   #dashGrid { flex:1; min-height: 0; grid-template-rows: 1fr; position: relative; }
   #dashGrid .card { height: 100%; }
+  #dashHeader { position: relative; z-index: 10000; }
   /* Show slot boxes during edit mode */
   #dashGrid .slot-outline {
     border: 2px dashed rgba(255,255,255,0.18);
@@ -19,16 +20,16 @@
   }
 </style>
 <div class="dashboard-wrap">
-  <div class="card" style="margin-bottom: 8px;">
+  <div class="card" id="dashHeader" style="margin-bottom: 8px;">
     <div class="row" style="align-items:center; justify-content:space-between;">
       <div class="title">Dashboard</div>
       <div class="row" id="dashControls" style="gap:8px;">
         <div style="width:12px;"></div>
-        <button class="small-btn" id="dashColsDec">- Col</button>
+        <button class="small-btn" id="dashColsDec" onclick="window.dashColsDec && window.dashColsDec()">- Col</button>
         <div class="pill" id="dashColsLabel">3 cols</div>
-        <button class="small-btn" id="dashColsInc">+ Col</button>
+        <button class="small-btn" id="dashColsInc" onclick="window.dashColsInc && window.dashColsInc()">+ Col</button>
         <div style="width:12px;"></div>
-        <button class="small-btn" id="dashToggleEdit">Edit: Off</button>
+        <button class="small-btn" id="dashToggleEdit" onclick="window.dashToggleEdit && window.dashToggleEdit()">Edit: Off</button>
       </div>
     </div>
     <div class="sub">Configure pages and widgets. Changes are saved to config.json.</div>
@@ -36,3 +37,4 @@
 
   <div id="dashGrid" class="grid"></div>
 </div>
+

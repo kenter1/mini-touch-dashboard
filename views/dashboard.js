@@ -1,4 +1,4 @@
-// Dashboard: configurable widget grid with pages/slots
+﻿// Dashboard: configurable widget grid with pages/slots
 exports.init = function init(ctx) {
   const { config } = ctx;
   const path = require('path');
@@ -173,13 +173,36 @@ exports.init = function init(ctx) {
     const pageLabel = document.getElementById('dashPageLabel'); if (pageLabel) pageLabel.textContent = `Page ${pageIndex+1} / ${dash.pages.length}`;
     const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
     const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
+    // Ensure header controls are always interactive
+    wireHeaderControls();
+
+    // Compute exact column layout honoring widget.col when present
+    function layoutPositions(items, totalCols) {
+      const occ = Array(totalCols).fill(false);
+      const out = [];
+      for (const w of (items || [])) {
+        const span = Math.max(1, Math.min(totalCols, Number(w.span) || 1));
+        let start = (w && Number.isFinite(w.col)) ? Math.max(0, Math.min(totalCols - span, Number(w.col))) : -1;
+        const fits = (s) => s >= 0 && s + span <= totalCols && occ.slice(s, s + span).every(v => !v);
+        if (!fits(start)) {
+          start = -1;
+          for (let s = 0; s + span <= totalCols; s++) { if (fits(s)) { start = s; break; } }
+        }
+        if (start >= 0) {
+          for (let k = 0; k < span; k++) occ[start + k] = true;
+          out.push({ w, start, span });
+        }
+      }
+      return { positions: out, occupied: occ };
+    }
+    const { positions, occupied } = layoutPositions(page.widgets || [], cols);
 
     // When editing, draw slot outlines across the row without affecting layout (and enable clicking empty slots)
     if (editMode) {
       const overlay = document.createElement('div');
       overlay.style.position = 'absolute';
       overlay.style.inset = '0';
-      overlay.style.zIndex = '1000';
+      overlay.style.zIndex = '10';
       // Let underlying widgets receive clicks; we'll attach clickable plus boxes separately
       overlay.style.pointerEvents = 'none';
       grid.appendChild(overlay);
@@ -188,84 +211,47 @@ exports.init = function init(ctx) {
       const gw = grid.clientWidth;
       const gh = grid.clientHeight;
       const colW = cols > 0 ? (gw - gap * (cols - 1)) / cols : gw;
-      // Build map of current widgets positions in first row
-      const visible = (page.widgets || []).slice(0, cols);
-      const positions = [];
-      let usedCols = 0;
-      for (let j = 0; j < visible.length; j++) {
-        const w = visible[j];
-        const span = Math.max(1, Math.min(cols - usedCols, Number(w.span)||1));
-        positions.push({ index: j, start: usedCols, end: usedCols + span });
-        usedCols += span;
-        if (usedCols >= cols) break;
-      }
+
+      // Draw clickable plus on every free column
       for (let i = 0; i < cols; i++) {
-        if (i >= usedCols) {
-          const slot = document.createElement('div');
-          slot.className = 'slot-outline slot-empty';
-          slot.style.position = 'absolute';
-          slot.style.top = '0px';
-          slot.style.height = gh + 'px';
-          slot.style.left = Math.round(i * (colW + gap)) + 'px';
-          slot.style.width = Math.max(0, Math.floor(colW)) + 'px';
-          slot.style.pointerEvents = 'auto';
-          slot.style.cursor = 'pointer';
-          slot.title = 'Click to add a widget';
-          slot.textContent = '+';
-          slot.onclick = (ev) => {
+        const left = Math.round(i * (colW + gap));
+        const width = Math.max(0, Math.floor(colW));
+        if (!occupied[i]) {
+          const plus = document.createElement("div");
+          plus.className = "slot-outline slot-empty";
+          plus.style.position = "absolute"; plus.style.top = "0px";
+          plus.style.left = left + "px"; plus.style.width = width + "px"; plus.style.height = gh + "px";
+          plus.style.pointerEvents = "auto"; plus.style.cursor = "pointer"; plus.title = "Click to add a widget"; plus.textContent = "+";
+          plus.onclick = (ev) => {
             ev.stopPropagation();
-            // Inline picker inside this slot to avoid positioning issues
-            try { document.getElementById('widgetPicker')?.remove(); } catch {}
-            const panel = document.createElement('div');
-            panel.id = 'widgetPicker';
-            panel.style.position = 'absolute';
-            panel.style.inset = '12px';
-            panel.style.display = 'flex';
-            panel.style.flexDirection = 'column';
-            panel.style.gap = '8px';
-            panel.style.alignItems = 'stretch';
-            panel.style.justifyContent = 'center';
-            panel.style.background = 'var(--card)';
-            panel.style.border = '1px solid rgba(255,255,255,0.15)';
-            panel.style.borderRadius = '10px';
-            panel.style.boxShadow = '0 10px 30px rgba(0,0,0,0.35)';
-            const types = Object.keys(widgets);
-            types.forEach(t => {
-              const btn = document.createElement('button');
-              btn.className = 'small-btn';
-              btn.textContent = `Add ${t}`;
-              btn.onclick = (e2) => {
-                e2.stopPropagation();
-                const arr = (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []);
-                const targetPos = positions.find(p => p.start >= i);
-                const insertIndexVisible = targetPos ? targetPos.index : visible.length;
-                const insertIndex = Math.min(arr.length, insertIndexVisible);
-                arr.splice(insertIndex, 0, { type: t, span: 1 });
-                saveConfig();
-                render();
-              };
+            try { document.getElementById("widgetPicker")?.remove(); } catch {}
+            const panel = document.createElement("div"); panel.id = "widgetPicker";
+            panel.style.position = "absolute"; panel.style.inset = "12px"; panel.style.display = "flex"; panel.style.flexDirection = "column"; panel.style.gap = "8px"; panel.style.alignItems = "stretch"; panel.style.justifyContent = "center"; panel.style.background = "var(--card)"; panel.style.border = "1px solid rgba(255,255,255,0.15)"; panel.style.borderRadius = "10px"; panel.style.boxShadow = "0 10px 30px rgba(0,0,0,0.35)";
+            Object.keys(widgets).forEach(t => {
+              const btn = document.createElement("button"); btn.className = "small-btn"; btn.textContent = `Add ${t}`;
+              btn.onclick = (e2) => { e2.stopPropagation(); (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []).push({ type: t, span: 1, col: i }); saveConfig(); render(); };
               panel.appendChild(btn);
             });
-            // Cancel button
-            const cancel = document.createElement('button');
-            cancel.className = 'small-btn';
-            cancel.textContent = 'Cancel';
-            cancel.onclick = (e3) => { e3.stopPropagation(); try { panel.remove(); } catch {} };
+            const cancel = document.createElement("button"); cancel.className = "small-btn"; cancel.textContent = "Cancel"; cancel.onclick = (e3) => { e3.stopPropagation(); try { panel.remove(); } catch {} };
             panel.appendChild(cancel);
-            slot.appendChild(panel);
+            plus.appendChild(panel);
           };
-          overlay.appendChild(slot);
+          overlay.appendChild(plus);
+        } else {
+          const occ = document.createElement("div"); occ.className = "slot-outline";
+          occ.style.position = "absolute"; occ.style.top = "0px";
+          occ.style.left = left + "px"; occ.style.width = width + "px"; occ.style.height = gh + "px";
+          occ.style.pointerEvents = "none"; occ.style.opacity = "0.12"; overlay.appendChild(occ);
         }
       }
     }
 
-    // Ensure one horizontal row: show up to `cols` widgets side-by-side
-    (page.widgets || []).slice(0, cols).forEach((w, idx) => {
+    // Render widgets at computed positions
+    positions.sort((a,b)=>a.start-b.start).forEach(({ w, start, span }) => {
       const def = widgets[w.type];
-      const span = Math.max(1, Math.min(cols, Number(w.span)||1));
       const card = document.createElement('div');
       card.className = 'card';
-      card.style.gridColumn = `span ${span}`;
+      card.style.gridColumn = `${start + 1} / span ${span}`;
       card.style.gridRow = '1';
       if (editMode) {
         // Overlay outline (non-blocking)
@@ -278,7 +264,7 @@ exports.init = function init(ctx) {
         outline.style.pointerEvents = 'none';
         outline.style.boxSizing = 'border-box';
         card.appendChild(outline);
-        // Floating controls (overlay)
+                // Floating controls (overlay)
         const ctrls = document.createElement('div');
         ctrls.style.position = 'absolute';
         ctrls.style.top = '6px';
@@ -291,13 +277,13 @@ exports.init = function init(ctx) {
         ctrls.style.borderRadius = '8px';
         ctrls.style.pointerEvents = 'auto';
         const mkBtn = (label, title) => { const b = document.createElement('button'); b.className='small-btn'; b.textContent=label; b.title=title; b.style.padding='4px 8px'; b.style.lineHeight='1'; return b; };
-        const dec = mkBtn('−','Narrower');
+        const dec = mkBtn('-', 'Narrower');
         const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span;
-        const inc = mkBtn('+','Wider');
-        const del = mkBtn('✕','Remove');
-        dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, span - 1); saveConfig(); render(); };
-        inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, span + 1); saveConfig(); render(); };
-        del.onclick = (e) => { e.stopPropagation(); page.widgets.splice(idx,1); saveConfig(); render(); };
+        const inc = mkBtn('+', 'Wider');
+        const del = mkBtn('x', 'Remove');
+        dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Number(w.span||1) - 1); saveConfig(); render(); };
+        inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, Number(w.span||1) + 1); saveConfig(); render(); };
+        del.onclick = (e) => { e.stopPropagation(); const arr = page.widgets || []; const i0 = arr.indexOf(w); if (i0 >= 0) arr.splice(i0,1); saveConfig(); render(); };
         ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc); ctrls.appendChild(del);
         card.appendChild(ctrls);
       }
@@ -308,12 +294,58 @@ exports.init = function init(ctx) {
     });
   }
 
-  // Wire controls
-  const prevBtn = document.getElementById('dashPrevPage'); if (prevBtn) prevBtn.onclick = () => { pageIndex = (pageIndex - 1 + dash.pages.length) % dash.pages.length; dash.pageIndex = pageIndex; saveConfig(); render(); };
-  const nextBtn = document.getElementById('dashNextPage'); if (nextBtn) nextBtn.onclick = () => { pageIndex = (pageIndex + 1) % dash.pages.length; dash.pageIndex = pageIndex; saveConfig(); render(); };
-  const colsDec = document.getElementById('dashColsDec'); if (colsDec) colsDec.onclick = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); };
-  const colsInc = document.getElementById('dashColsInc'); if (colsInc) colsInc.onclick = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
-  const toggleEdit = document.getElementById('dashToggleEdit'); if (toggleEdit) toggleEdit.onclick = () => { editMode = !editMode; render(); };
+  // Wire controls (ensure bindings persist and can't be blocked by overlays)
+  function wireHeaderControls() {
+    function bind(el, handler) {
+      if (!el) return;
+      if (el.dataset.bound === '1') return;
+      el.style.pointerEvents = 'auto'; el.style.position = 'relative'; el.style.zIndex = 200;
+      el.addEventListener('click', (e) => { e.stopPropagation(); handler(e); }, true); // capture
+      el.dataset.bound = '1';
+    }
+    bind(document.getElementById('dashColsDec'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); });
+    bind(document.getElementById('dashColsInc'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); });
+    bind(document.getElementById('dashToggleEdit'), () => { editMode = !editMode; render(); });
+  }
+  wireHeaderControls();
+
+  // Last‑resort global handler in capture phase to guarantee header clicks work
+  try {
+    if (!window.__dashHeaderDelegation) {
+      window.__dashHeaderDelegation = true;
+      document.addEventListener('click', (e) => {
+        try {
+          const el = e.target instanceof Element ? e.target : null;
+          if (!el) return;
+          const dec = el.closest && el.closest('#dashColsDec');
+          const inc = el.closest && el.closest('#dashColsInc');
+          const tog = el.closest && el.closest('#dashToggleEdit');
+          if (dec) {
+            e.stopPropagation();
+            const p = dash.pages[pageIndex];
+            p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1));
+            saveConfig();
+            render();
+            return;
+          }
+          if (inc) {
+            e.stopPropagation();
+            const p = dash.pages[pageIndex];
+            p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1));
+            saveConfig();
+            render();
+            return;
+          }
+          if (tog) {
+            e.stopPropagation();
+            editMode = !editMode;
+            render();
+            return;
+          }
+        } catch {}
+      }, true);
+    }
+  } catch {}
   function showWidgetPicker(anchorEl, onChoose) {
     try { document.getElementById('widgetPicker')?.remove(); } catch {}
     const types = Object.keys(widgets);
@@ -373,6 +405,15 @@ exports.init = function init(ctx) {
   };
 
   render();
-
+  // Expose safe global handlers as a fallback for header clicks
+  try {
+    window.dashColsDec = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); };
+    window.dashColsInc = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
+    window.dashToggleEdit = () => { editMode = !editMode; render(); };
+  } catch {}
   exports.destroy = function destroy() { clearTimers(); };
 };
+
+
+
+

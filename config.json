@@ -80,12 +80,8 @@
   "dashboard": {
     "pages": [
       {
-        "columns": 3,
+        "columns": 5,
         "widgets": [
-          {
-            "type": "weather",
-            "span": 1
-          },
           {
             "type": "clock",
             "span": 1

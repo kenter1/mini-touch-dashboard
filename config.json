@@ -80,23 +80,33 @@
   "dashboard": {
     "pages": [
       {
-        "columns": 5,
+        "columns": 4,
         "widgets": [
           {
             "type": "clock",
-            "span": 2
+            "span": 1
           },
           {
             "type": "weather",
-            "span": 2,
+            "span": 1,
             "col": 4
           },
           {
-            "type": "feed",
+            "type": "digital-clock",
             "span": 1,
-            "col": 2
+            "col": 1,
+            "rspan": 1,
+            "row": 0
+          },
+          {
+            "type": "clock",
+            "span": 1,
+            "col": 2,
+            "row": 1,
+            "rspan": 1
           }
-        ]
+        ],
+        "split": true
       }
     ],
     "pageIndex": 0

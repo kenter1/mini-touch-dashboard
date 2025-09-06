@@ -25,8 +25,8 @@ exports.init = function init(ctx) {
   // Helpers
   function formatBps(bps) { const units=['bps','Kbps','Mbps','Gbps']; let i=0, v=Math.max(0,bps); while(v>=1000&&i<units.length-1){v/=1000;i++;} return v.toFixed(1)+' '+units[i]; }
 
-  // Widget registry
-  const widgets = {
+  // Widget registry (built-ins; can be extended by external files)
+  let widgets = {
     clock: {
       title: 'Clock',
       render(container) {
@@ -161,41 +161,86 @@ exports.init = function init(ctx) {
     }
   };
 
+  // Load external widgets from extras/widgets so users can add new ones post-build
+  (function loadExternalWidgets() {
+    try {
+      const bases = [
+        // Installed app resources (electron-builder extraResources)
+        path.join((process && process.resourcesPath) || __dirname, 'extras', 'widgets'),
+        // Dev run fallback
+        path.join(__dirname, '..', 'extras', 'widgets'),
+        path.join(__dirname, 'extras', 'widgets')
+      ];
+      const loaded = new Set(Object.keys(widgets));
+      for (const base of bases) {
+        let list = [];
+        try { if (fs.existsSync(base)) { list = fs.readdirSync(base).filter(f => /\.js$/i.test(f)); } } catch { list = []; }
+        for (const file of list) {
+          try {
+            const full = path.join(base, file);
+            delete require.cache[require.resolve(full)];
+            const mod = require(full);
+            const def = (mod && (mod.default || mod)) || null;
+            if (!def) continue;
+            const id = String(def.id || file.replace(/\.js$/i, ''));
+            if (!id || loaded.has(id)) continue;
+            if (typeof def.render !== 'function') continue;
+            widgets[id] = { title: def.title || id, render: def.render };
+            loaded.add(id);
+          } catch {}
+        }
+      }
+    } catch {}
+  })();
+
   function render() {
     clearTimers();
     const grid = document.getElementById('dashGrid'); if (!grid) return;
     const page = dash.pages[pageIndex] || { columns: 3, widgets: [] };
     const cols = Math.max(1, Math.min(6, Number(page.columns) || 3));
+    const rows = page.split ? 2 : 1;
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
     grid.innerHTML = '';
 
     // Header controls
     const pageLabel = document.getElementById('dashPageLabel'); if (pageLabel) pageLabel.textContent = `Page ${pageIndex+1} / ${dash.pages.length}`;
     const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
     const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
+    const splitBtn = document.getElementById('dashToggleSplit'); if (splitBtn) splitBtn.textContent = `Split: ${page.split ? 'On' : 'Off'}`;
     // Ensure header controls are always interactive
     wireHeaderControls();
 
-    // Compute exact column layout honoring widget.col when present
-    function layoutPositions(items, totalCols) {
-      const occ = Array(totalCols).fill(false);
+    // Compute 2D layout (columns x rows=1 or 2). Respect w.col/w.row and w.span (cols) and w.rspan (rows)
+    function layoutPositions(items, totalCols, totalRows) {
+      const occ = Array.from({ length: totalRows }, () => Array(totalCols).fill(false));
       const out = [];
       for (const w of (items || [])) {
         const span = Math.max(1, Math.min(totalCols, Number(w.span) || 1));
-        let start = (w && Number.isFinite(w.col)) ? Math.max(0, Math.min(totalCols - span, Number(w.col))) : -1;
-        const fits = (s) => s >= 0 && s + span <= totalCols && occ.slice(s, s + span).every(v => !v);
-        if (!fits(start)) {
-          start = -1;
-          for (let s = 0; s + span <= totalCols; s++) { if (fits(s)) { start = s; break; } }
+        const rspan = Math.max(1, Math.min(totalRows, Number(w.rspan) || totalRows));
+        const wantCol = Number.isFinite(w.col) ? Math.max(0, Math.min(totalCols - span, Number(w.col))) : -1;
+        const wantRow = Number.isFinite(w.row) ? Math.max(0, Math.min(totalRows - rspan, Number(w.row))) : -1;
+        const fits = (c, r) => (
+          c >= 0 && r >= 0 && c + span <= totalCols && r + rspan <= totalRows &&
+          (() => { for (let rr = r; rr < r + rspan; rr++) { for (let cc = c; cc < c + span; cc++) { if (occ[rr][cc]) return false; } } return true; })()
+        );
+        let startC = wantCol, startR = wantRow;
+        if (!fits(startC, startR)) {
+          startC = -1; startR = -1;
+          outer: for (let rr = 0; rr + rspan <= totalRows; rr++) {
+            for (let cc = 0; cc + span <= totalCols; cc++) {
+              if (fits(cc, rr)) { startC = cc; startR = rr; break outer; }
+            }
+          }
         }
-        if (start >= 0) {
-          for (let k = 0; k < span; k++) occ[start + k] = true;
-          out.push({ w, start, span });
+        if (startC >= 0 && startR >= 0) {
+          for (let rr = startR; rr < startR + rspan; rr++) { for (let cc = startC; cc < startC + span; cc++) occ[rr][cc] = true; }
+          out.push({ w, startC, startR, span, rspan });
         }
       }
       return { positions: out, occupied: occ };
     }
-    const { positions, occupied } = layoutPositions(page.widgets || [], cols);
+    const { positions, occupied } = layoutPositions(page.widgets || [], cols, rows);
 
     // When editing, draw slot outlines across the row without affecting layout (and enable clicking empty slots)
     if (editMode) {
@@ -211,16 +256,20 @@ exports.init = function init(ctx) {
       const gw = grid.clientWidth;
       const gh = grid.clientHeight;
       const colW = cols > 0 ? (gw - gap * (cols - 1)) / cols : gw;
+      const rowH = rows > 0 ? (gh - gap * (rows - 1)) / rows : gh;
 
-      // Draw clickable plus on every free column
-      for (let i = 0; i < cols; i++) {
-        const left = Math.round(i * (colW + gap));
-        const width = Math.max(0, Math.floor(colW));
-        if (!occupied[i]) {
+      // Draw clickable plus on every free cell
+      for (let r = 0; r < rows; r++) {
+        for (let i = 0; i < cols; i++) {
+          const left = Math.round(i * (colW + gap));
+          const top = Math.round(r * (rowH + gap));
+          const width = Math.max(0, Math.floor(colW));
+          const height = Math.max(0, Math.floor(rowH));
+          if (!occupied[r][i]) {
           const plus = document.createElement("div");
           plus.className = "slot-outline slot-empty";
-          plus.style.position = "absolute"; plus.style.top = "0px";
-          plus.style.left = left + "px"; plus.style.width = width + "px"; plus.style.height = gh + "px";
+          plus.style.position = "absolute"; plus.style.top = top + "px";
+          plus.style.left = left + "px"; plus.style.width = width + "px"; plus.style.height = height + "px";
           plus.style.pointerEvents = "auto"; plus.style.cursor = "pointer"; plus.title = "Click to add a widget"; plus.textContent = "+";
           plus.onclick = (ev) => {
             ev.stopPropagation();
@@ -229,7 +278,7 @@ exports.init = function init(ctx) {
             panel.style.position = "absolute"; panel.style.inset = "12px"; panel.style.display = "flex"; panel.style.flexDirection = "column"; panel.style.gap = "8px"; panel.style.alignItems = "stretch"; panel.style.justifyContent = "center"; panel.style.background = "var(--card)"; panel.style.border = "1px solid rgba(255,255,255,0.15)"; panel.style.borderRadius = "10px"; panel.style.boxShadow = "0 10px 30px rgba(0,0,0,0.35)";
             Object.keys(widgets).forEach(t => {
               const btn = document.createElement("button"); btn.className = "small-btn"; btn.textContent = `Add ${t}`;
-              btn.onclick = (e2) => { e2.stopPropagation(); (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []).push({ type: t, span: 1, col: i }); saveConfig(); render(); };
+              btn.onclick = (e2) => { e2.stopPropagation(); (dash.pages[pageIndex].widgets = dash.pages[pageIndex].widgets || []).push({ type: t, span: 1, col: i, row: r, rspan: (rows>1?1:1) }); saveConfig(); render(); };
               panel.appendChild(btn);
             });
             const cancel = document.createElement("button"); cancel.className = "small-btn"; cancel.textContent = "Cancel"; cancel.onclick = (e3) => { e3.stopPropagation(); try { panel.remove(); } catch {} };
@@ -237,22 +286,23 @@ exports.init = function init(ctx) {
             plus.appendChild(panel);
           };
           overlay.appendChild(plus);
-        } else {
-          const occ = document.createElement("div"); occ.className = "slot-outline";
-          occ.style.position = "absolute"; occ.style.top = "0px";
-          occ.style.left = left + "px"; occ.style.width = width + "px"; occ.style.height = gh + "px";
-          occ.style.pointerEvents = "none"; occ.style.opacity = "0.12"; overlay.appendChild(occ);
+          } else {
+            const occBox = document.createElement("div"); occBox.className = "slot-outline";
+            occBox.style.position = "absolute"; occBox.style.top = top + "px";
+            occBox.style.left = left + "px"; occBox.style.width = width + "px"; occBox.style.height = height + "px";
+            occBox.style.pointerEvents = "none"; occBox.style.opacity = "0.12"; overlay.appendChild(occBox);
+          }
         }
       }
     }
 
     // Render widgets at computed positions
-    positions.sort((a,b)=>a.start-b.start).forEach(({ w, start, span }) => {
+    positions.sort((a,b)=> (a.startR - b.startR) || (a.startC - b.startC)).forEach(({ w, startC, startR, span, rspan }) => {
       const def = widgets[w.type];
       const card = document.createElement('div');
       card.className = 'card';
-      card.style.gridColumn = `${start + 1} / span ${span}`;
-      card.style.gridRow = '1';
+      card.style.gridColumn = `${startC + 1} / span ${span}`;
+      card.style.gridRow = `${startR + 1} / span ${rspan || rows}`;
       if (editMode) {
         // Overlay outline (non-blocking)
         card.style.position = 'relative';
@@ -280,17 +330,21 @@ exports.init = function init(ctx) {
         const dec = mkBtn('-', 'Narrower');
         const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span;
         const inc = mkBtn('+', 'Wider');
+        const half = mkBtn('½', 'Half height');
+        const full = mkBtn('1', 'Full height');
         const del = mkBtn('x', 'Remove');
         dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Number(w.span||1) - 1); saveConfig(); render(); };
         inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, Number(w.span||1) + 1); saveConfig(); render(); };
+        half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min((w.row|0), rows-1)); saveConfig(); render(); } };
+        full.onclick = (e) => { e.stopPropagation(); w.rspan = rows; w.row = 0; saveConfig(); render(); };
         del.onclick = (e) => { e.stopPropagation(); const arr = page.widgets || []; const i0 = arr.indexOf(w); if (i0 >= 0) arr.splice(i0,1); saveConfig(); render(); };
-        ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc); ctrls.appendChild(del);
+        ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc); if (rows>1){ ctrls.appendChild(half); ctrls.appendChild(full);} ctrls.appendChild(del);
         card.appendChild(ctrls);
       }
       const body = document.createElement('div');
       card.appendChild(body);
       grid.appendChild(card);
-      if (def && typeof def.render === 'function') def.render(body); else body.textContent = `Unknown widget: ${w.type}`;
+      if (def && typeof def.render === 'function') def.render(body, { config, addTimer }); else body.textContent = `Unknown widget: ${w.type}`;
     });
   }
 
@@ -306,6 +360,7 @@ exports.init = function init(ctx) {
     bind(document.getElementById('dashColsDec'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); });
     bind(document.getElementById('dashColsInc'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); });
     bind(document.getElementById('dashToggleEdit'), () => { editMode = !editMode; render(); });
+    bind(document.getElementById('dashToggleSplit'), () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); });
   }
   wireHeaderControls();
 
@@ -320,6 +375,7 @@ exports.init = function init(ctx) {
           const dec = el.closest && el.closest('#dashColsDec');
           const inc = el.closest && el.closest('#dashColsInc');
           const tog = el.closest && el.closest('#dashToggleEdit');
+          const split = el.closest && el.closest('#dashToggleSplit');
           if (dec) {
             e.stopPropagation();
             const p = dash.pages[pageIndex];
@@ -339,6 +395,14 @@ exports.init = function init(ctx) {
           if (tog) {
             e.stopPropagation();
             editMode = !editMode;
+            render();
+            return;
+          }
+          if (split) {
+            e.stopPropagation();
+            const p = dash.pages[pageIndex];
+            p.split = !p.split;
+            saveConfig();
             render();
             return;
           }
@@ -410,6 +474,7 @@ exports.init = function init(ctx) {
     window.dashColsDec = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); };
     window.dashColsInc = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
     window.dashToggleEdit = () => { editMode = !editMode; render(); };
+    window.dashToggleSplit = () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); };
   } catch {}
   exports.destroy = function destroy() { clearTimers(); };
 };

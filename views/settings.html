@@ -9,10 +9,20 @@
   <div class="card" style="position:absolute; left:12px; right:12px; top:60px; bottom:12px; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:14px;">
     <div class="sub" style="margin-bottom:4px;">Customize your dashboard, theme, and sidebar apps.</div>
 
-    <div id="generalSettings" class="card" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 12px; margin-bottom: 4px;">
-      <!-- Populated by settings.js -->
+    <div id="settingsTabs" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+      <button id="tabBtnGeneral" class="small-btn" data-tab="general" style="padding:6px 12px;">General</button>
+      <button id="tabBtnApps" class="small-btn" data-tab="apps" style="padding:6px 12px;">Apps</button>
     </div>
 
-    <div id="settingsList" style="display:flex; flex-direction:column; gap:12px; min-height: 0;"></div>
+    <div id="tabPages" style="position:relative; display:flex; flex-direction:column; gap:12px; min-height:0;">
+      <div id="tab-general" class="tab-page" style="display:block;">
+        <div id="generalSettings" class="card" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 12px; margin-bottom: 4px;">
+          <!-- Populated by settings.js -->
+        </div>
+      </div>
+      <div id="tab-apps" class="tab-page" style="display:none;">
+        <div id="settingsList" style="display:flex; flex-direction:column; gap:12px; min-height: 0;"></div>
+      </div>
+    </div>
   </div>
 </div>

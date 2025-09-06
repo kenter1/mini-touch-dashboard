@@ -108,6 +108,153 @@ exports.init = function init(ctx) {
     });
   }
 
+  // Modernized General UI (segmented controls, sliders, toggles)
+  function renderGeneralModern() {
+    if (!generalBox) return;
+    const sidebar = ensureSidebar(config);
+    const dashboard = (config.dashboard = config.dashboard || {});
+    const navEnabled = dashboard.navEnabled !== false;
+    const theme = config.theme || 'auto';
+    const bg = config.background || { mode: 'solid', color: '#0b0f1a' };
+    generalBox.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:12px; align-items:stretch;">
+        <div class="card" style="gap:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03);">
+          <div class="title" style="gap:8px;"><span>Appearance</span></div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Theme</div>
+            <div id="themeSeg" style="display:flex; gap:6px;">
+              <button class="small-btn" data-val="auto" style="flex:1; height:36px; border-radius:8px;">Auto</button>
+              <button class="small-btn" data-val="dark" style="flex:1; height:36px; border-radius:8px;">Dark</button>
+              <button class="small-btn" data-val="light" style="flex:1; height:36px; border-radius:8px;">Light</button>
+            </div>
+            <select id="genTheme" style="display:none">
+              <option value="auto" ${theme==='auto'?'selected':''}>Auto</option>
+              <option value="dark" ${theme==='dark'?'selected':''}>Dark</option>
+              <option value="light" ${theme==='light'?'selected':''}>Light</option>
+            </select>
+          </div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Background</div>
+            <div id="bgSeg" style="display:flex; gap:6px; margin-bottom:8px;">
+              <button class="small-btn" data-val="solid" style="flex:1; height:32px; border-radius:8px;">Solid</button>
+              <button class="small-btn" data-val="image" style="flex:1; height:32px; border-radius:8px;">Image</button>
+              <button class="small-btn" data-val="windows" style="flex:1; height:32px; border-radius:8px;">Windows</button>
+            </div>
+            <select id="bgMode" style="display:none">
+              <option value="solid" ${bg.mode==='solid'?'selected':''}>Solid</option>
+              <option value="image" ${bg.mode==='image'?'selected':''}>Image</option>
+              <option value="windows" ${bg.mode==='windows'?'selected':''}>Windows</option>
+            </select>
+            <div id="bgSolidWrap" style="${bg.mode==='solid'?'':'display:none;'}">
+              <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Color</div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input id="bgColor" type="color" value="${bg.color || '#0b0f1a'}" style="width:48px; height:36px; border-radius:8px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0;">
+                <input id="bgColorText" type="text" value="${bg.color || '#0b0f1a'}" placeholder="#0b0f1a" style="flex:1; height:36px; font-size:15px; border-radius:8px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+                <div id="bgSwatch" style="width:36px; height:36px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:${bg.color || '#0b0f1a'}"></div>
+              </div>
+            </div>
+            <div id="bgImageWrap" style="${bg.mode==='image'?'':'display:none;'}">
+              <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Image File</div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input id="bgImagePath" type="text" value="${(bg.path||'').replace(/\\\\/g,'/')}" placeholder="C:/path/to/image.jpg" style="flex:1; height:36px; font-size:15px; border-radius:8px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+                <button id="bgBrowse" class="small-btn" style="height:36px;">Choose</button>
+                <input id="bgFileInput" type="file" accept="image/*" style="display:none;" />
+              </div>
+            </div>
+            <div id="bgWinWrap" class="sub" style="${bg.mode==='windows'?'':'display:none;'}">Uses your current Windows wallpaper.</div>
+          </div>
+        </div>
+
+        <div class="card" style="gap:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03);">
+          <div class="title"><span>Layout</span></div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Sidebar Items Per Page</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="small-btn" id="itemsDec" style="width:36px; height:32px;">-</button>
+              <input id="itemsPerPage" type="range" min="1" max="12" value="${sidebar.itemsPerPage || 5}" style="flex:1; accent-color: var(--accent);">
+              <button class="small-btn" id="itemsInc" style="width:36px; height:32px;">+</button>
+              <div id="itemsVal" class="pill" style="min-width:34px; text-align:center;">${sidebar.itemsPerPage || 5}</div>
+            </div>
+          </div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Dashboard Navigation Panel</div>
+            <label style="display:flex; align-items:center; gap:10px; height:32px;">
+              <input id="genDashNav" type="checkbox" ${navEnabled?'checked':''} style="width:0;height:0;opacity:0;position:absolute;" />
+              <div id="navToggle" style="width:52px; height:28px; border-radius:999px; background:${navEnabled?'var(--accent)':'rgba(255,255,255,0.15)'}; position:relative; transition:background .2s; border:1px solid rgba(255,255,255,0.15);">
+                <div style="position:absolute; top:2px; left:${navEnabled?'26px':'2px'}; width:24px; height:24px; background:#fff; border-radius:999px; transition:left .2s;"></div>
+              </div>
+              <span>Enable dashboard header (pages, edit, columns)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Theme segmented
+    const themeSel = generalBox.querySelector('#genTheme');
+    const themeSeg = Array.from(generalBox.querySelectorAll('#themeSeg .small-btn'));
+    const setThemeUI = (val) => {
+      themeSeg.forEach(b => { b.style.outline = (b.dataset.val===val)?'2px solid var(--accent)':'1px solid rgba(255,255,255,0.12)'; b.style.background = (b.dataset.val===val)?'rgba(77,163,255,0.18)':'var(--card)'; });
+      themeSel.value = val;
+    };
+    themeSeg.forEach(b => b.addEventListener('click', ()=> setThemeUI(b.dataset.val)));
+    setThemeUI(themeSel.value || 'auto');
+
+    // Background segmented
+    const modeSel = generalBox.querySelector('#bgMode');
+    const bgSeg = Array.from(generalBox.querySelectorAll('#bgSeg .small-btn'));
+    const solidWrap = generalBox.querySelector('#bgSolidWrap');
+    const imageWrap = generalBox.querySelector('#bgImageWrap');
+    const winWrap = generalBox.querySelector('#bgWinWrap');
+    const setBgModeUI = (val) => {
+      bgSeg.forEach(b => { b.style.outline = (b.dataset.val===val)?'2px solid var(--accent)':'1px solid rgba(255,255,255,0.12)'; b.style.background = (b.dataset.val===val)?'rgba(77,163,255,0.18)':'var(--card)'; });
+      modeSel.value = val;
+      solidWrap.style.display = val==='solid'?'':'none';
+      imageWrap.style.display = val==='image'?'':'none';
+      winWrap.style.display = val==='windows'?'':'none';
+    };
+    bgSeg.forEach(b => b.addEventListener('click', ()=> setBgModeUI(b.dataset.val)));
+    setBgModeUI(modeSel.value || 'solid');
+
+    // Color inputs sync + swatch
+    const colorInput = generalBox.querySelector('#bgColor');
+    const colorText = generalBox.querySelector('#bgColorText');
+    const swatch = generalBox.querySelector('#bgSwatch');
+    colorInput?.addEventListener('input', ()=>{ colorText.value = colorInput.value; swatch.style.background = colorInput.value; });
+    colorText?.addEventListener('input', ()=>{ colorInput.value = colorText.value; swatch.style.background = colorText.value; });
+
+    // Image chooser
+    const fileBtn = generalBox.querySelector('#bgBrowse');
+    const fileInput = generalBox.querySelector('#bgFileInput');
+    const pathInput = generalBox.querySelector('#bgImagePath');
+    fileBtn?.addEventListener('click', (e)=>{ e.preventDefault(); fileInput.click(); });
+    fileInput?.addEventListener('change', ()=>{
+      const f = fileInput.files && fileInput.files[0];
+      if (f && f.path) { pathInput.value = f.path; }
+    });
+
+    // Items per page controls
+    const itemsRange = generalBox.querySelector('#itemsPerPage');
+    const itemsValEl = generalBox.querySelector('#itemsVal');
+    const decBtn = generalBox.querySelector('#itemsDec');
+    const incBtn = generalBox.querySelector('#itemsInc');
+    const clampItems = () => { const v = Math.min(12, Math.max(1, parseInt(itemsRange.value,10)||5)); itemsRange.value = String(v); itemsValEl.textContent = v; };
+    itemsRange?.addEventListener('input', clampItems);
+    decBtn?.addEventListener('click', ()=>{ itemsRange.value = String(Math.max(1, (parseInt(itemsRange.value,10)||1)-1)); clampItems(); });
+    incBtn?.addEventListener('click', ()=>{ itemsRange.value = String(Math.min(12, (parseInt(itemsRange.value,10)||1)+1)); clampItems(); });
+    clampItems();
+
+    // Toggle switch visual sync
+    const navChk = generalBox.querySelector('#genDashNav');
+    const navToggle = generalBox.querySelector('#navToggle');
+    const updateNavToggle = () => {
+      navToggle.style.background = navChk.checked ? 'var(--accent)' : 'rgba(255,255,255,0.15)';
+      const knob = navToggle.firstElementChild; if (knob) knob.style.left = navChk.checked ? '26px' : '2px';
+    };
+    navToggle?.addEventListener('click', ()=>{ navChk.checked = !navChk.checked; updateNavToggle(); });
+    updateNavToggle();
+  }
+
   function renderSettings() {
     settingsList.innerHTML = '';
     (config.apps || []).forEach((app, idx) => {
@@ -192,6 +339,25 @@ exports.init = function init(ctx) {
     });
   }
 
+  // Simple tabs for Settings view
+  function initTabs() {
+    const btnGen = document.getElementById('tabBtnGeneral');
+    const btnApps = document.getElementById('tabBtnApps');
+    const pageGen = document.getElementById('tab-general');
+    const pageApps = document.getElementById('tab-apps');
+    if (!btnGen || !btnApps || !pageGen || !pageApps) return;
+    const activate = (which) => {
+      const isGen = which === 'general';
+      pageGen.style.display = isGen ? 'block' : 'none';
+      pageApps.style.display = isGen ? 'none' : 'block';
+      btnGen.style.outline = isGen ? '2px solid var(--accent)' : 'none';
+      btnApps.style.outline = !isGen ? '2px solid var(--accent)' : 'none';
+    };
+    btnGen.addEventListener('click', ()=> activate('general'));
+    btnApps.addEventListener('click', ()=> activate('apps'));
+    activate('general');
+  }
+
   function collectSettingsFromUI() {
     const newApps = [];
     const cards = Array.from(settingsList.querySelectorAll('.app-card'));
@@ -221,9 +387,11 @@ exports.init = function init(ctx) {
       Object.assign(config, fresh);
       ensureApps(config);
       rebuildSidebar();
-      renderGeneral();
+      renderGeneralModern();
       renderSettings();
+      try { window.applyTheme && window.applyTheme(config); } catch {}
       try { window.applyBackground && window.applyBackground(config); } catch {}
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
     } catch (e) {
       alert('Failed to reload config.json');
     }
@@ -265,7 +433,9 @@ exports.init = function init(ctx) {
       config.apps = collectSettingsFromUI();
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
       rebuildSidebar();
+      try { window.applyTheme && window.applyTheme(config); } catch {}
       try { window.applyBackground && window.applyBackground(config); } catch {}
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
       alert('Saved');
     } catch (e) {
       alert('Failed to save: ' + e.message);
@@ -273,8 +443,9 @@ exports.init = function init(ctx) {
   });
 
   // initial render
-  renderGeneral();
+  renderGeneralModern();
   renderSettings();
+  initTabs();
 };
 
 // Floating emoji picker (uses code points to avoid encoding issues)
@@ -303,3 +474,6 @@ function openEmojiPicker(anchor, onPick) {
   document.addEventListener('keydown', onKey, true);
   function close(){ try { pop.remove(); } catch{} document.removeEventListener('mousedown', onDoc, true); document.removeEventListener('keydown', onKey, true); }
 }
+
+
+

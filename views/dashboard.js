@@ -610,6 +610,10 @@ exports.init = function init(ctx) {
     addWidgetFlow(addWidget);
   };
 
+  // React to config updates from settings without requiring a view reload
+  const onConfigUpdated = () => { try { render(); } catch {} };
+  try { window.addEventListener('config-updated', onConfigUpdated); } catch {}
+
   render();
   // Expose safe global handlers as a fallback for header clicks
   try {
@@ -618,7 +622,11 @@ exports.init = function init(ctx) {
     window.dashToggleEdit = () => { if (dash.navEnabled === false) { editMode = false; } else { editMode = !editMode; } render(); };
     window.dashToggleSplit = () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); };
   } catch {}
-  exports.destroy = function destroy() { clearTimers(); };
+  exports.onConfigUpdated = onConfigUpdated;
+  exports.destroy = function destroy() {
+    clearTimers();
+    try { window.removeEventListener('config-updated', onConfigUpdated); } catch {}
+  };
 };
 
 

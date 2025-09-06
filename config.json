@@ -20,7 +20,7 @@
       "autoStart": true
     }
   },
-  "theme": "auto",
+  "theme": "dark",
   "refresh": {
     "metricsMs": 1500,
     "metricsMsApi": 1500,
@@ -36,16 +36,16 @@
       "page": 0
     },
     {
-      "id": "dashboard-1",
-      "type": "dashboard",
-      "label": "System",
+      "id": "browser-1",
+      "type": "browser",
+      "label": "App",
       "icon": "🖥️",
       "page": 0
     },
     {
       "id": "web-2",
       "type": "web",
-      "label": "Music",
+      "label": "App",
       "icon": "🎵",
       "page": 0,
       "url": "https://music.youtube.com/"
@@ -63,7 +63,7 @@
       "type": "weather",
       "label": "Weather",
       "icon": "⛅",
-      "page": 0
+      "page": 1
     },
     {
       "id": "web-5",
@@ -75,7 +75,7 @@
     }
   ],
   "sidebar": {
-    "itemsPerPage": 5
+    "itemsPerPage": 4
   },
   "dashboard": {
     "pages": [
@@ -111,6 +111,7 @@
     "navEnabled": false
   },
   "background": {
-    "mode": "windows"
+    "mode": "solid",
+    "color": "#1949cc"
   }
 }

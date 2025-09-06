@@ -45,20 +45,22 @@
 
     <div class="row" style="margin-top:12px; align-items:flex-start; gap:12px; flex-wrap:nowrap;">
       <div class="card" style="flex:1; min-width:0;">
-        <div class="label" style="margin-bottom:6px;">Top CPU Processes</div>
-        <div id="topCpuList" class="feed"></div>
+        <div class="label" style="margin-bottom:6px;">Top Processes</div>
+        <div class="row" style="gap:12px; align-items:flex-start; flex-wrap:nowrap;">
+          <div style="flex:1; min-width:0;">
+            <div class="label" style="margin-bottom:6px;">Top CPU Processes</div>
+            <div id="topCpuList" class="feed"></div>
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div class="label" style="margin-bottom:6px;">Top Memory Processes</div>
+            <div id="topMemList" class="feed"></div>
+          </div>
+        </div>
       </div>
       <div class="card" style="flex:1; min-width:0;">
         <div class="label" style="margin-bottom:6px;">Storage (per drive)</div>
         <div id="storageList" class="feed"></div>
       </div>
     </div>
-
-  <div class="row" style="margin-top:12px; align-items:flex-start; gap:12px; flex-wrap:nowrap;">
-    <div class="card" style="flex:1; min-width:0;">
-      <div class="label" style="margin-bottom:6px;">Top Memory Processes</div>
-      <div id="topMemList" class="feed"></div>
-    </div>
-  </div>
   </div>
 </div>

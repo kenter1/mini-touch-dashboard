@@ -42,6 +42,63 @@ exports.init = function init(ctx) {
   const cpuHist = Array(60).fill(0);
   const gpuHist = Array(60).fill(0);
   const lastIfTotals = {}; // per-interface last rx/tx for rate calc
+  const isWin = process.platform === 'win32';
+  async function getLhmTemps() {
+    if (!isWin) return null;
+    // Try LibreHardwareMonitor's built-in web server default
+    const base = ((config.metrics && config.metrics.lhm && config.metrics.lhm.baseUrl) || 'http://localhost:8085').replace(/\/+$/,'');
+    try {
+      const res = await fetch(base + '/data.json', { cache: 'no-store' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const out = { cpu: null, gpu: null };
+      const seen = new Set();
+      function scan(node) {
+        if (!node || typeof node !== 'object') return;
+        if (seen.has(node)) return; seen.add(node);
+        const text = String(node.Text || node.text || node.Name || node.name || '');
+        const type = String(node.SensorType || node.Type || node.type || '');
+        const val = (node.Value !== undefined ? node.Value : node.value);
+        const tryRecord = (t, n) => {
+          const label = String(t || '').toLowerCase();
+          const v = Number(n);
+          if (!Number.isFinite(v)) return;
+          if (/cpu/.test(label)) { out.cpu = Math.max(out.cpu ?? -Infinity, v); }
+          if (/(gpu|graphics|nvidia|radeon|amd)/.test(label)) { out.gpu = Math.max(out.gpu ?? -Infinity, v); }
+        };
+        if (typeof val === 'number') {
+          if (type.toLowerCase() === 'temperature' || /temp/i.test(text)) tryRecord(text, val);
+        } else if (typeof val === 'string') {
+          const m = val.match(/-?\d+(?:\.\d+)?/);
+          if (m) {
+            if (type.toLowerCase() === 'temperature' || /temp/i.test(text)) tryRecord(text, parseFloat(m[0]));
+          }
+        }
+        const kids = [];
+        if (Array.isArray(node.Children)) kids.push(...node.Children);
+        if (Array.isArray(node.children)) kids.push(...node.children);
+        if (Array.isArray(node.Sensors)) kids.push(...node.Sensors);
+        if (Array.isArray(node.sensors)) kids.push(...node.sensors);
+        for (const k of Object.keys(node)) {
+          const v = node[k];
+          if (v && typeof v === 'object' && v !== node.parent) kids.push(v);
+        }
+        kids.forEach(scan);
+      }
+      scan(data);
+      if (out.cpu === -Infinity) out.cpu = null;
+      if (out.gpu === -Infinity) out.gpu = null;
+      return out;
+    } catch { return null; }
+  }
+  function formatMem(bytes) {
+    const b = Number(bytes) || 0;
+    if (b <= 0) return '0 MB';
+    const gb = b / (1024 ** 3);
+    if (gb >= 1) return gb.toFixed(1) + ' GB';
+    const mb = b / (1024 ** 2);
+    return Math.max(mb, 0).toFixed(0) + ' MB';
+  }
 
   function toDisplayTemp(celsius) {
     const v = Number(celsius);
@@ -125,10 +182,14 @@ exports.init = function init(ctx) {
           const s = sensors.find(s => regexArr.some(r => r.test(String(s.label||s.name||''))));
           return Number(s && s.value) || 0;
         };
-        // Glances reports Celsius; convert to configured display unit
-        let cpuTempC = findSensor([/cpu|package|tctl|tdie/i]);
-        let gpuTempC = findSensor([/gpu|nvidia|radeon/i]);
-        // Do not use local temps to avoid spawning PowerShell/WMI
+        // Prefer LibreHardwareMonitor temps on Windows; fallback to Glances
+        let cpuTempC = 0, gpuTempC = 0;
+        try {
+          const lhm = await getLhmTemps();
+          if (lhm) { cpuTempC = Number(lhm.cpu)||0; gpuTempC = Number(lhm.gpu)||0; }
+        } catch {}
+        if (!(cpuTempC > 0)) cpuTempC = findSensor([/cpu|package|tctl|tdie/i]);
+        if (!(gpuTempC > 0)) gpuTempC = findSensor([/gpu|nvidia|radeon/i]);
         const cpuTempDisp = toDisplayTemp(cpuTempC);
         const gpuTempDisp = toDisplayTemp(gpuTempC);
         const cpuTemp = document.getElementById('cpuTemp'); if (cpuTemp) cpuTemp.textContent = (cpuTempDisp>0?cpuTempDisp+UNIT:'-');
@@ -179,7 +240,27 @@ exports.init = function init(ctx) {
 
         const plist = Array.isArray(data?.processlist) ? data.processlist : [];
         const byCpu = plist.filter(p=>Number(p.cpu_percent)>0.1).sort((a,b)=>Number(b.cpu_percent)-Number(a.cpu_percent)).slice(0,5);
-        const byMem = plist.filter(p=>Number(p.memory_percent)>0.1).sort((a,b)=>Number(b.memory_percent)-Number(a.memory_percent)).slice(0,5);
+        const totalMemBytesApi = Number(data?.mem?.total) || 0;
+        function getMemBytesApi(p) {
+          try {
+            // Prefer RSS if available
+            const mi = p && p.memory_info;
+            if (mi && typeof mi === 'object') {
+              const rss = Number(mi.rss || mi.RSS || mi[0]) || 0; // some variants use array
+              if (rss > 0) return rss;
+            }
+            const rssCand = Number(p.rss || p.memory_rss || p.mem_rss || p.mem_rss_bytes) || 0;
+            if (rssCand > 0) return rssCand;
+            const pct = Number(p.memory_percent) || 0;
+            if (pct > 0 && totalMemBytesApi > 0) return Math.round(totalMemBytesApi * pct / 100);
+          } catch {}
+          return 0;
+        }
+        const withMemBytes = plist.map(p => ({ p, bytes: getMemBytesApi(p) }));
+        const byMem = withMemBytes
+          .filter(x => x.bytes > 0 || Number(x.p.memory_percent) > 0.1)
+          .sort((a,b)=> (b.bytes||Number(b.p.memory_percent)||0) - (a.bytes||Number(a.p.memory_percent)||0))
+          .slice(0,5);
         const cpuEl = document.getElementById('topCpuList'); const memEl = document.getElementById('topMemList');
         const coreCount = (() => {
           const c = Number(data?.cpu?.cpucore) || Number(data?.cpu?.logical) || Number(data?.cpu?.count) || 0;
@@ -190,7 +271,15 @@ exports.init = function init(ctx) {
           const norm = Math.max(0, Math.min(100, raw / coreCount));
           return `<div class="feed-item"><span class="pill" style="margin-right:6px;">${norm.toFixed(1)}%</span>${p.name}</div>`;
         }).join('');
-        if (memEl) memEl.innerHTML = byMem.map(p=>`<div class="feed-item"><span class="pill" style="margin-right:6px;">${Number(p.memory_percent).toFixed(1)}%</span>${p.name}</div>`).join('');
+        if (memEl) memEl.innerHTML = byMem.map(x=>{
+          const name = x.p.name;
+          const bytes = x.bytes;
+          if (bytes > 0) {
+            return `<div class="feed-item"><span class="pill" style="margin-right:6px;">${formatMem(bytes)}</span>${name}</div>`;
+          }
+          const pct = Number(x.p.memory_percent) || 0;
+          return `<div class="feed-item"><span class="pill" style="margin-right:6px;">${pct.toFixed(1)}%</span>${name}</div>`;
+        }).join('');
 
         // Network top list from API if available
         const netArr = Array.isArray(data?.network) ? data.network : [];
@@ -245,17 +334,28 @@ exports.init = function init(ctx) {
       if (cpuLoad) cpuLoad.textContent = cpu + '%';
       if (cpuBar) cpuBar.style.width = Math.min(cpu,100) + '%';
 
-      // CPU Temp
-      const tDisp = toDisplayTemp(temp.main);
+      // CPU Temp (prefer LibreHardwareMonitor on Windows)
+      let cpuC = Number(temp.main) || 0;
+      try {
+        const lhm = await getLhmTemps();
+        if (lhm && Number(lhm.cpu) > 0) cpuC = Number(lhm.cpu);
+      } catch {}
+      const tDisp = toDisplayTemp(cpuC);
       const cpuTemp = document.getElementById('cpuTemp');
       if (cpuTemp) cpuTemp.textContent = (tDisp>0 ? tDisp + UNIT : '-');
 
       // GPU Temp
       let gpuT = 0;
-      if (gfx && Array.isArray(gfx.controllers) && gfx.controllers.length) {
-        for (const ctrl of gfx.controllers) {
-          const v = Number(ctrl && (ctrl.temperatureGpu || ctrl.temperature || 0)) || 0;
-          if (v > 0) { gpuT = v; break; }
+      try {
+        const lhm = await getLhmTemps();
+        if (lhm && Number(lhm.gpu) > 0) gpuT = Number(lhm.gpu);
+      } catch {}
+      if (!(gpuT > 0)) {
+        if (gfx && Array.isArray(gfx.controllers) && gfx.controllers.length) {
+          for (const ctrl of gfx.controllers) {
+            const v = Number(ctrl && (ctrl.temperatureGpu || ctrl.temperature || 0)) || 0;
+            if (v > 0) { gpuT = v; break; }
+          }
         }
       }
       const gpuTemp = document.getElementById('gpuTemp');
@@ -343,11 +443,33 @@ exports.init = function init(ctx) {
       // Top processes
       if (procs && procs.list) {
         const byCpu = procs.list.filter(p=>p.cpu>0.1).sort((a,b)=>b.cpu-a.cpu).slice(0,5);
-        const byMem = procs.list.filter(p=>p.mem>0.1).sort((a,b)=>b.mem-a.mem).slice(0,5);
+        const totalMemBytesLocal = Number(mem && mem.total) || 0;
+        function getMemBytesLocal(p) {
+          try {
+            const rss = Number(p.mem_rss || p.rss || p.memRss || p.mem_rss_bytes) || 0;
+            if (rss > 0) return rss;
+            const pct = Number(p.mem) || Number(p.pmem) || 0; // percent
+            if (pct > 0 && totalMemBytesLocal > 0) return Math.round(totalMemBytesLocal * pct / 100);
+          } catch {}
+          return 0;
+        }
+        const withMemBytesLocal = procs.list.map(p => ({ p, bytes: getMemBytesLocal(p) }));
+        const byMem = withMemBytesLocal
+          .filter(x => x.bytes > 0 || (Number(x.p.mem) || 0) > 0.1)
+          .sort((a,b)=> (b.bytes||Number(b.p.mem)||0) - (a.bytes||Number(a.p.mem)||0))
+          .slice(0,5);
         const cpuEl = document.getElementById('topCpuList');
         const memEl = document.getElementById('topMemList');
         if (cpuEl) cpuEl.innerHTML = byCpu.map(p=>`<div class="feed-item"><span class="pill" style="margin-right:6px;">${p.cpu.toFixed(1)}%</span>${p.name}</div>`).join('');
-        if (memEl) memEl.innerHTML = byMem.map(p=>`<div class="feed-item"><span class="pill" style="margin-right:6px;">${p.mem.toFixed(1)}%</span>${p.name}</div>`).join('');
+        if (memEl) memEl.innerHTML = byMem.map(x=>{
+          const name = x.p.name;
+          const bytes = x.bytes;
+          if (bytes > 0) {
+            return `<div class="feed-item"><span class="pill" style="margin-right:6px;">${formatMem(bytes)}</span>${name}</div>`;
+          }
+          const pct = Number(x.p.mem) || 0;
+          return `<div class="feed-item"><span class="pill" style="margin-right:6px;">${pct.toFixed(1)}%</span>${name}</div>`;
+        }).join('');
       }
     } catch {}
   }

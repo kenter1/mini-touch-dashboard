@@ -72,6 +72,16 @@ Optional: Add Glances UI as a sidebar app
 
 In Local mode, temps come from `systeminformation`. On some hardware, CPU temp can show `-` (sensor not exposed). Running as admin or installing vendor monitoring tools can help. Glances mode often reports more sensors if available.
 
+This app can also read temperatures from LibreHardwareMonitor (preferred on Windows). Enable its Remote Web Server and the dashboard will read temps from `http://localhost:8085/data.json` by default. You can override via `config.json`:
+
+```
+{
+  "metrics": {
+    "lhm": { "baseUrl": "http://127.0.0.1:8085", "autoStart": true }
+  }
+}
+```
+
 ## Development
 
 - Live-reload is built-in for renderer changes. Edit HTML/JS/CSS and the app reloads. Changes to `main.js` trigger a relaunch.
@@ -100,6 +110,14 @@ Build prerequisites on Windows:
 
 - Place your Glances wrapper binary at `extras/glances-web.exe` before running `npm run build:win`. The installer selects "Install local Glances" by default and will copy it into the installed app.
 - Alternatively, set `!define GLANCES_URL` in `build/installer.nsh` to a URL you control so the installer downloads the binary at install time.
+
+### Bundling LibreHardwareMonitor (Windows)
+
+- Download the latest LibreHardwareMonitor release and place `LibreHardwareMonitor.exe` into one of these paths before building:
+  - `extras/LibreHardwareMonitor/LibreHardwareMonitor.exe` (preferred)
+  - or `extras/LibreHardwareMonitor.exe`
+- The installer bundles everything under `extras/` (see `package.json` `build.extraResources`). On first run, the app will attempt to start LibreHardwareMonitor automatically on Windows if found.
+- To expose temperatures to the dashboard, open LibreHardwareMonitor once and enable "Remote Web Server" (default port 8085). The setting is persisted, so subsequent auto-starts work headlessly. If you use a different port, set `metrics.lhm.baseUrl` accordingly in `config.json`.
 
 - Glances API unreachable: verify `glances -w` is running and `baseUrl` matches. If remote, confirm firewall allows port 61208.
 - Mixed metrics or odd characters: ensure `config.json` is saved as UTF-8 and icons use standard emoji/characters.

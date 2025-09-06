@@ -16,6 +16,7 @@ let tray = null;
 let win = null;
 let reloadWatcher = null;
 let glancesProc = null;
+let lhmProc = null;
 
 function pickBottomDisplay() {
   const displays = screen.getAllDisplays();
@@ -36,19 +37,40 @@ function createWindow() {
   }
 
   // Optionally auto-start a bundled Glances web server if configured and present
+  // Also try to start LibreHardwareMonitor on Windows for temps
+  maybeStartLibreHardwareMonitor(config);
   maybeStartGlances(config);
 
   const targetDisplay = pickBottomDisplay();
-  const { x, y, width, height } = targetDisplay.bounds;
+  // const { x, y, width, height } = targetDisplay.bounds;
 
-  win = new BrowserWindow({
+  // win = new BrowserWindow({
+  //   x, y, width, height,
+  //   frame: false,
+  //   alwaysOnTop: true,
+  //   skipTaskbar: true,
+  //   autoHideMenuBar: true,
+  //   resizable: false,
+  //   movable: false,
+  //   webPreferences: {
+  //     nodeIntegration: true,      // Keep simple for a local dashboard
+  //     contextIsolation: false,    // (For production harden with a preload bridge)
+  //     backgroundThrottling: false,
+  //     webviewTag: true            // Enable <webview> for in-app browser views
+  //   }
+  // });
+    //Temp
+    let { x, y, width, height } = targetDisplay.bounds;
+    width = 800;
+    height = 800;
+    win = new BrowserWindow({
     x, y, width, height,
-    frame: false,
+    frame: true,
     alwaysOnTop: true,
     skipTaskbar: true,
-    autoHideMenuBar: true,
-    resizable: false,
-    movable: false,
+    autoHideMenuBar: false,
+    resizable: true,
+    movable: true,
     webPreferences: {
       nodeIntegration: true,      // Keep simple for a local dashboard
       contextIsolation: false,    // (For production harden with a preload bridge)
@@ -159,6 +181,59 @@ function maybeStartGlances(config) {
   } catch {}
 }
 
+function maybeStartLibreHardwareMonitor(config) {
+  try {
+    if (process.platform !== 'win32') return; // Windows-only utility
+    const lhmCfg = (config.metrics && config.metrics.lhm) || {};
+    const auto = lhmCfg.autoStart !== false; // default true
+    if (!auto) return;
+
+    const base = process.resourcesPath || __dirname;
+    const candidates = [
+      // If installed by installer step under resources
+      path.join(base, 'LibreHardwareMonitor', 'LibreHardwareMonitor.exe'),
+      path.join(base, 'extras', 'LibreHardwareMonitor', 'LibreHardwareMonitor.exe'),
+      // Dev/runtime fallbacks
+      path.join(__dirname, 'LibreHardwareMonitor', 'LibreHardwareMonitor.exe'),
+      path.join(__dirname, 'extras', 'LibreHardwareMonitor', 'LibreHardwareMonitor.exe'),
+      // Plain exe in extras
+      path.join(base, 'extras', 'LibreHardwareMonitor.exe'),
+      path.join(__dirname, 'extras', 'LibreHardwareMonitor.exe')
+    ];
+    const exe = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+    if (!exe) return;
+    if (lhmProc && !lhmProc.killed) return;
+    // Best-effort: remove Mark-of-the-Web and ensure exec perms
+    try { fs.unlinkSync(exe + ':Zone.Identifier'); } catch {}
+    try { fs.chmodSync(exe, 0o755); } catch {}
+
+    const cwd = path.dirname(exe);
+    const start = (retrying) => {
+      try {
+        const child = spawn(exe, [], { stdio: 'ignore', windowsHide: true, cwd });
+        child.on('error', async (err) => {
+          // Handle EACCES due to MOTW; try PowerShell Unblock-File once
+          if (!retrying && err && (err.code === 'EACCES' || err.code === 'EPERM')) {
+            try {
+              const ps = spawn(process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : 'powershell.exe',
+                ['-NoProfile','-Command', `try { Unblock-File -Path '${exe.replace(/'/g, "''")}' } catch {}`],
+                { stdio: 'ignore', windowsHide: true });
+              ps.on('exit', () => start(true));
+              return;
+            } catch {}
+          }
+        });
+        lhmProc = child;
+      } catch {
+        // ignore
+      }
+    };
+    // Launch; omit args to avoid failing on unknown switches
+    start(false);
+  } catch {}
+}
+
 app.on('before-quit', () => {
   try { if (glancesProc && !glancesProc.killed) glancesProc.kill(); } catch {}
+  try { if (lhmProc && !lhmProc.killed) lhmProc.kill(); } catch {}
 });

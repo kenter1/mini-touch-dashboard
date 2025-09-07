@@ -75,7 +75,8 @@
     }
   ],
   "sidebar": {
-    "itemsPerPage": 5
+    "itemsPerPage": 5,
+    "autoHide": true
   },
   "dashboard": {
     "pages": [
@@ -102,6 +103,13 @@
             "type": "clock",
             "span": 1,
             "col": 2,
+            "row": 1,
+            "rspan": 1
+          },
+          {
+            "type": "timer",
+            "span": 2,
+            "col": 3,
             "row": 1,
             "rspan": 1
           }

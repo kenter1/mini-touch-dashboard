@@ -12,11 +12,11 @@ exports.init = function init(ctx) {
 
   const DEFAULT_ICON = '\uD83C\uDF10'; // 🌐
 
-  function ensureSidebar(cfg) { cfg.sidebar = cfg.sidebar || {}; return cfg.sidebar; }
+  function ensureSidebar(cfg) { cfg.sidebar = cfg.sidebar || { autoHide: false }; return cfg.sidebar; }
 
   function renderGeneral() {
     if (!generalBox) return;
-    const sidebar = ensureSidebar(config);
+    const sidebarCfg = ensureSidebar(config);
     const theme = config.theme || 'auto';
     generalBox.innerHTML = `
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; align-items:center;">
@@ -32,8 +32,17 @@ exports.init = function init(ctx) {
           <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Sidebar Items Per Page</div>
           <div style="display:flex; gap:8px; align-items:center;">
             <button class="small-btn" id="itemsDec" style="width:40px;">-</button>
-            <input id="itemsPerPage" type="number" min="1" max="12" value="${sidebar.itemsPerPage || 5}" style="flex:1; height:40px; font-size:16px; text-align:center; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12);">
+            <input id="itemsPerPage" type="number" min="1" max="12" value="${sidebarCfg.itemsPerPage || 5}" style="flex:1; height:40px; font-size:16px; text-align:center; border-radius:10px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12);">
             <button class="small-btn" id="itemsInc" style="width:40px;">+</button>
+          </div>
+        </div>
+        <div>
+          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Sidebar Auto Hide</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="autoHideToggle" ${sidebarCfg.autoHide ? 'checked' : ''} style="width:18px; height:18px;">
+              <span>Enable Auto Hide</span>
+            </label>
           </div>
         </div>
       </div>
@@ -171,13 +180,15 @@ exports.init = function init(ctx) {
   document.getElementById('settingsSave')?.addEventListener('click', () => {
     try {
       // collect general (safe lookups)
-      const sidebar = ensureSidebar(config);
+      const sidebarCfg = ensureSidebar(config);
       const itemsEl = generalBox?.querySelector('#itemsPerPage');
-      const itemsVal = itemsEl ? parseInt(itemsEl.value, 10) : (sidebar.itemsPerPage || 5);
+      const itemsVal = itemsEl ? parseInt(itemsEl.value, 10) : (sidebarCfg.itemsPerPage || 5);
       const items = Number.isFinite(itemsVal) ? itemsVal : 5;
-      sidebar.itemsPerPage = Math.min(12, Math.max(1, items));
+      sidebarCfg.itemsPerPage = Math.min(12, Math.max(1, items));
       const themeEl = generalBox?.querySelector('#genTheme');
       config.theme = themeEl?.value || config.theme || 'auto';
+      const autoHideEl = generalBox?.querySelector('#autoHideToggle');
+      sidebarCfg.autoHide = autoHideEl ? autoHideEl.checked : false;
 
       // collect apps
       config.apps = collectSettingsFromUI();

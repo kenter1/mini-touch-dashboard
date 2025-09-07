@@ -632,6 +632,150 @@
       }
     });
     }
+    
+    // Auto-hide sidebar functionality with error handling
+    try {
+      // Function to initialize auto-hide functionality
+      function initAutoHide() {
+        // Check if auto-hide is enabled in config
+        const sidebarConfig = config.sidebar || {};
+        if (!sidebarConfig.autoHide) {
+          return; // Auto-hide not enabled, do nothing
+        }
+        
+        // Add CSS for auto-hide functionality
+        const style = document.createElement('style');
+        style.textContent = `
+          .app.autohide-enabled {
+            padding-left: 12px;
+            transition: padding-left 0.3s ease;
+          }
+          .sidebar.autohide-enabled {
+            transition: transform 0.3s ease;
+          }
+          .sidebar.autohide-enabled.hidden {
+            transform: translateX(-100%);
+          }
+          .sidebar-toggle {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 30px;
+            height: 100%;
+            background: transparent;
+            cursor: pointer;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+          }
+          .sidebar-toggle.visible {
+            opacity: 0; /* Keep transparent but still clickable */
+          }
+          .sidebar-toggle::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 80px;
+            background: var(--accent);
+            border-radius: 0 3px 3px 0;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+          }
+          .sidebar-toggle:hover::before {
+            opacity: 1;
+          }
+        `;
+        document.head.appendChild(style);
+        
+        // Add toggle button that covers the entire left edge but is mostly transparent
+        const sidebarToggle = document.createElement('div');
+        sidebarToggle.className = 'sidebar-toggle';
+        sidebarToggle.id = 'sidebarToggle';
+        document.body.appendChild(sidebarToggle);
+        
+        // Get DOM elements
+        const sidebar = document.getElementById('sidebar');
+        const appContainer = document.querySelector('.app');
+        
+        if (!sidebar || !appContainer) {
+          return; // Required elements not found
+        }
+        
+        // Add classes for auto-hide
+        appContainer.classList.add('autohide-enabled');
+        sidebar.classList.add('autohide-enabled');
+        
+        let isSidebarHidden = false;
+        let touchStartX = 0;
+        let isDragging = false;
+        
+        function showSidebar() {
+          sidebar.classList.remove('hidden');
+          appContainer.style.paddingLeft = '96px';
+          sidebarToggle.classList.remove('visible');
+          isSidebarHidden = false;
+        }
+        
+        function hideSidebar() {
+          sidebar.classList.add('hidden');
+          appContainer.style.paddingLeft = '12px';
+          sidebarToggle.classList.add('visible');
+          isSidebarHidden = true;
+        }
+        
+        // Initially hide the sidebar
+        hideSidebar();
+        
+        // Touch drag functionality for closing sidebar
+        sidebar.addEventListener('touchstart', (e) => {
+          if (!isSidebarHidden) {
+            touchStartX = e.touches[0].clientX;
+            isDragging = true;
+          }
+        }, { passive: true });
+        
+        sidebar.addEventListener('touchmove', (e) => {
+          if (!isDragging || isSidebarHidden) return;
+          
+          const touchX = e.touches[0].clientX;
+          const diffX = touchX - touchStartX;
+          
+          // Only detect drag to the left
+          if (diffX < -30) { // 30px threshold
+            hideSidebar();
+            isDragging = false;
+          }
+        }, { passive: true });
+        
+        sidebar.addEventListener('touchend', () => {
+          isDragging = false;
+        });
+        
+        // Touch/click to show sidebar when hidden
+        sidebarToggle.addEventListener('touchstart', (e) => {
+          if (isSidebarHidden) {
+            e.preventDefault();
+            showSidebar();
+          }
+        }, { passive: false });
+        
+        sidebarToggle.addEventListener('click', (e) => {
+          if (isSidebarHidden) {
+            e.preventDefault();
+            showSidebar();
+          }
+        });
+      }
+      
+      // Initialize auto-hide functionality
+      initAutoHide();
+    } catch (e) {
+      // Silently fail if there's an error to avoid breaking the app
+      console.warn('Auto-hide functionality failed to initialize:', e);
+    }
   </script>
 </body>
 </html>

@@ -28,7 +28,8 @@ exports.init = function init(ctx) {
   function formatBps(bps) { const units=['bps','Kbps','Mbps','Gbps']; let i=0, v=Math.max(0,bps); while(v>=1000&&i<units.length-1){v/=1000;i++;} return v.toFixed(1)+' '+units[i]; }
 
   // Widget registry (built-ins; can be extended by external files)
-  let widgets = {
+  let widgets = {};
+  /* Inline widgets moved to modules below
     clock: {
       title: 'Clock',
       render(container) {
@@ -119,6 +120,47 @@ exports.init = function init(ctx) {
         });
       }
     },
+    cpu: {
+      title: 'CPU',
+      render(container) {
+        // 270° arc gauge, centered, larger size
+        const size = 220, stroke = 16, r = (size/2) - stroke - 2;
+        const cx = size/2, cy = size/2;
+        const c = 2 * Math.PI * r;
+        const gapRatio = 0.25; // 90° gap -> 270° arc
+        const gap = c * gapRatio;
+        const visible = c - gap;
+        const gapAngleDeg = 360 * gapRatio;
+        const startAngle = -90 - (gapAngleDeg / 2); // center the gap at bottom
+
+        container.innerHTML = `
+          <div style="display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; height:100%;">
+            <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+              <circle cx="${cx}" cy="${cy}" r="${r}" stroke="rgba(255,255,255,0.12)" stroke-width="${stroke}" fill="none" stroke-linecap="round" transform="rotate(${startAngle} ${cx} ${cy})" stroke-dasharray="${visible} ${gap}" />
+              <circle id="cpuArc" cx="${cx}" cy="${cy}" r="${r}" stroke="var(--accent)" stroke-width="${stroke}" fill="none" stroke-linecap="round" transform="rotate(${startAngle} ${cx} ${cy})" />
+              <text x="${cx}" y="${cy+10}" text-anchor="middle" fill="var(--fg)" font-size="36" font-weight="800" id="cpuPctText">0%</text>
+            </svg>
+            <div class="sub" style="text-transform:uppercase; letter-spacing:0.8px;">CPU</div>
+          </div>`;
+        const arc = container.querySelector('#cpuArc');
+        const txt = container.querySelector('#cpuPctText');
+        if (arc) { arc.style.strokeDasharray = `${0} ${c}`; arc.style.strokeDashoffset = `0`; }
+        const metrics = require('./metricsService');
+        metrics.start(config);
+        const unsubscribe = metrics.subscribe((data) => {
+          try {
+            if (!document.body.contains(container)) { try { unsubscribe(); } catch {}; return; }
+            const pct = Math.max(0, Math.min(100, Math.round(Number(data?.cpu?.loadPct)||0)));
+            if (txt) txt.textContent = pct + '%';
+            if (arc) {
+              const progress = visible * (pct/100);
+              // Single dash equals progress; remainder keeps the 90° gap intact
+              arc.style.strokeDasharray = `${progress} ${c - progress}`;
+            }
+          } catch {}
+        });
+      }
+    },
     feed: {
       title: 'Feed',
       render(container) {
@@ -154,7 +196,27 @@ exports.init = function init(ctx) {
         loadFeeds(); addTimer(setInterval(loadFeeds, (config.refresh && config.refresh.rssMs) || 600000));
       }
     }
-  };
+  */
+
+  // Load built-in widgets from views/widgets (refactored to separate files)
+  (function overrideWithLocalWidgets() {
+    try {
+      const mods = [
+        './widgets/clock',
+        './widgets/weather',
+        './widgets/system',
+        './widgets/cpu',
+        './widgets/feed',
+      ].map(p => { try { return require(p); } catch { return null; } });
+      mods.forEach(mod => {
+        const def = (mod && (mod.default || mod)) || null;
+        if (!def) return;
+        const id = String(def.id || '');
+        if (!id || typeof def.render !== 'function') return;
+        widgets[id] = { title: def.title || id, render: def.render };
+      });
+    } catch {}
+  })();
 
   // Load external widgets from extras/widgets so users can add new ones post-build
   (function loadExternalWidgets() {

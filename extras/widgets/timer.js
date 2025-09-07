@@ -19,28 +19,33 @@ module.exports = {
             <span id="timerDisplay">00:00</span>
           </div>
           <div id="timerInputContainer" style="display:none;">
-            <div id="timerDigitDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;padding:10px;min-height:70px;">00:00</div>
-            <div style="text-align:center;margin-top:10px;color:var(--muted);font-size:14px;">Type digits on your keyboard</div>
+            <div id="timerDigitDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;padding:10px;min-height:70px;">00:00:00</div>
+            <div style="text-align:center;margin-top:10px;color:var(--muted);font-size:14px;">Type digits on your keyboard (HH:MM:SS)</div>
           </div>
-          <div id="timerControls" style="display:flex;gap:8px;margin-top:10px;">
-            <button id="timerMainBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;">▶</button>
-            <button id="timerResetBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;display:none;">↺</button>
+          <div id="timerQuickButtons" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+            <button id="timerAdd30" class="small-btn" style="flex:1;min-width:70px;padding:8px;font-size:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);">+0:30</button>
+            <button id="timerAdd1" class="small-btn" style="flex:1;min-width:70px;padding:8px;font-size:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);">+1:00</button>
+            <button id="timerAdd5" class="small-btn" style="flex:1;min-width:70px;padding:8px;font-size:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);">+5:00</button>
+          </div>
+          <div id="timerControls" style="display:flex;gap:8px;margin-top:10px;justify-content:center;">
+            <button id="timerMainBtn" class="small-btn" style="width:60px;height:60px;font-size:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;">▶</button>
+            <button id="timerResetBtn" class="small-btn" style="width:60px;height:60px;font-size:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;display:none;">↺</button>
           </div>
         </div>
         
         <!-- Stopwatch Content -->
         <div id="stopwatchContent" style="display:none;flex-direction:column;gap:12px;">
           <div id="stopwatchDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;margin:10px 0;">00:00.00</div>
-          <div id="stopwatchControls" style="display:flex;gap:8px;">
-            <button id="stopwatchMainBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;">▶</button>
-            <button id="stopwatchResetBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;display:none;">↺</button>
+          <div id="stopwatchControls" style="display:flex;gap:8px;justify-content:center;">
+            <button id="stopwatchMainBtn" class="small-btn" style="width:60px;height:60px;font-size:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;">▶</button>
+            <button id="stopwatchResetBtn" class="small-btn" style="width:60px;height:60px;font-size:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;display:none;">↺</button>
           </div>
         </div>
       </div>
     `;
 
     // Timer variables
-    let timerDigits = ["0", "0", "0", "0"]; // Stores the 4 digits [min1, min2, sec1, sec2]
+    let timerDigits = ["0", "0", "0", "0", "0", "0"]; // Stores the 6 digits [hour1, hour2, min1, min2, sec1, sec2]
     let timerSeconds = 0;
     let timerRunning = false;
     let timerInterval = null;
@@ -66,6 +71,9 @@ module.exports = {
     const timerMainBtn = container.querySelector('#timerMainBtn');
     const timerResetBtn = container.querySelector('#timerResetBtn');
     const timerMuteBtn = container.querySelector('#timerMute');
+    const timerAdd30Btn = container.querySelector('#timerAdd30');
+    const timerAdd1Btn = container.querySelector('#timerAdd1');
+    const timerAdd5Btn = container.querySelector('#timerAdd5');
     
     const stopwatchDisplay = container.querySelector('#stopwatchDisplay');
     const stopwatchMainBtn = container.querySelector('#stopwatchMainBtn');
@@ -73,31 +81,50 @@ module.exports = {
     
     // Format time functions
     function formatTimer(seconds) {
-      const mins = Math.floor(seconds / 60);
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
       const secs = seconds % 60;
-      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      if (hrs > 0) {
+        return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      } else {
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
     }
     
     function formatStopwatch(milliseconds) {
       const totalSeconds = Math.floor(milliseconds / 1000);
-      const mins = Math.floor(totalSeconds / 60);
+      const hrs = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
       const secs = totalSeconds % 60;
       const ms = Math.floor((milliseconds % 1000) / 10);
-      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+      if (hrs > 0) {
+        return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+      } else {
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+      }
     }
     
-    // Format digits as MM:SS
+    // Format digits as HH:MM:SS
     function formatDigits(digits) {
-      return `${digits[0]}${digits[1]}:${digits[2]}${digits[3]}`;
+      return `${digits[0]}${digits[1]}:${digits[2]}${digits[3]}:${digits[4]}${digits[5]}`;
     }
     
-    // Convert MM:SS format to seconds
+    // Convert HH:MM:SS format to seconds
     function timeToSeconds(timeString) {
       const parts = timeString.split(':');
-      if (parts.length !== 2) return 0;
-      const minutes = parseInt(parts[0]) || 0;
-      const seconds = parseInt(parts[1]) || 0;
-      return minutes * 60 + seconds;
+      if (parts.length === 3) {
+        // HH:MM:SS format
+        const hours = parseInt(parts[0]) || 0;
+        const minutes = parseInt(parts[1]) || 0;
+        const seconds = parseInt(parts[2]) || 0;
+        return hours * 3600 + minutes * 60 + seconds;
+      } else if (parts.length === 2) {
+        // MM:SS format
+        const minutes = parseInt(parts[0]) || 0;
+        const seconds = parseInt(parts[1]) || 0;
+        return minutes * 60 + seconds;
+      }
+      return 0;
     }
     
     // Update displays
@@ -148,7 +175,7 @@ module.exports = {
       timerInputContainer.style.display = 'block';
       
       // Reset digits to zeros for fresh input
-      timerDigits = ["0", "0", "0", "0"];
+      timerDigits = ["0", "0", "0", "0", "0", "0"];
       updateTimerDigitDisplay();
       
       // Focus on the container to capture keyboard events
@@ -211,6 +238,19 @@ module.exports = {
     function toggleMute() {
       alarmMuted = !alarmMuted;
       timerMuteBtn.textContent = alarmMuted ? '🔇' : '🔊';
+    }
+    
+    // Quick time addition functions
+    function addTime(secondsToAdd) {
+      timerSeconds += secondsToAdd;
+      // Make sure we don't go negative
+      timerSeconds = Math.max(0, timerSeconds);
+      updateTimerDisplay();
+      
+      // If timer was at 0 and is now > 0, and it was running, restart it
+      if (timerRunning && timerSeconds > 0 && !timerInterval) {
+        startTimerInterval();
+      }
     }
     
     // Start timer interval (separate function for better control)
@@ -311,13 +351,15 @@ module.exports = {
       timerDigits[0] = timerDigits[1];
       timerDigits[1] = timerDigits[2];
       timerDigits[2] = timerDigits[3];
-      timerDigits[3] = digit;
+      timerDigits[3] = timerDigits[4];
+      timerDigits[4] = timerDigits[5];
+      timerDigits[5] = digit;
       
       updateTimerDigitDisplay();
     }
     
     function clearDigits() {
-      timerDigits = ["0", "0", "0", "0"];
+      timerDigits = ["0", "0", "0", "0", "0", "0"];
       updateTimerDigitDisplay();
     }
     
@@ -335,6 +377,8 @@ module.exports = {
       else if (e.key === 'Backspace') {
         e.preventDefault();
         // Shift digits right and add zero at the beginning
+        timerDigits[5] = timerDigits[4];
+        timerDigits[4] = timerDigits[3];
         timerDigits[3] = timerDigits[2];
         timerDigits[2] = timerDigits[1];
         timerDigits[1] = timerDigits[0];
@@ -357,6 +401,11 @@ module.exports = {
     
     // Keyboard event listener
     document.addEventListener('keydown', handleKeyboardInput);
+    
+    // Quick time buttons
+    timerAdd30Btn.addEventListener('click', () => addTime(30));
+    timerAdd1Btn.addEventListener('click', () => addTime(60));
+    timerAdd5Btn.addEventListener('click', () => addTime(300));
     
     // Event listeners for tabs
     timerTab.addEventListener('click', showTimer);

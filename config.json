@@ -72,12 +72,12 @@
   "dashboard": {
     "pages": [
       {
-        "columns": 4,
+        "columns": 6,
         "widgets": [
           {
             "type": "weather",
             "span": 1,
-            "col": 0,
+            "col": 2,
             "rspan": 2,
             "row": 0
           },
@@ -85,7 +85,7 @@
             "type": "system",
             "span": 1,
             "col": 1,
-            "row": 0,
+            "row": 1,
             "rspan": 1
           },
           {
@@ -98,7 +98,14 @@
           {
             "type": "cpu",
             "span": 1,
-            "col": 2,
+            "col": 0,
+            "row": 0,
+            "rspan": 1
+          },
+          {
+            "type": "cpu",
+            "span": 1,
+            "col": 1,
             "row": 0,
             "rspan": 1
           }

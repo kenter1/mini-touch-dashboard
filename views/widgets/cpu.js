@@ -8,8 +8,10 @@ module.exports = {
     const gapRatio = 0.25; // 90-degree gap -> 270-degree arc
     const gap = c * gapRatio;
     const visible = c - gap;
-    const gapAngleDeg = 360 * gapRatio;
-    const startAngle = -90 - (gapAngleDeg / 2); // center the gap at bottom
+    // Place the gap ("hole") at the bottom center of the circle.
+    // For a dash pattern [visible, gap], the gap center occurs at (startAngle - 45deg) when gapRatio=0.25.
+    // Setting startAngle to 135deg centers the gap at 90deg (bottom).
+    const startAngle = 135;
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; height:100%;">
@@ -17,8 +19,9 @@ module.exports = {
           <circle cx="${cx}" cy="${cy}" r="${r}" stroke="rgba(255,255,255,0.12)" stroke-width="${stroke}" fill="none" stroke-linecap="round" transform="rotate(${startAngle} ${cx} ${cy})" stroke-dasharray="${visible} ${gap}" />
           <circle id="cpuArc" cx="${cx}" cy="${cy}" r="${r}" stroke="var(--accent)" stroke-width="${stroke}" fill="none" stroke-linecap="round" transform="rotate(${startAngle} ${cx} ${cy})" />
           <text x="${cx}" y="${cy+10}" text-anchor="middle" fill="var(--fg)" font-size="36" font-weight="800" id="cpuPctText">0%</text>
+          <!-- CPU label positioned inside the bottom gap (hole) -->
+          <text x="${cx}" y="${Math.round(cy + r - (stroke/2) - 4)}" text-anchor="middle" fill="var(--fg)" font-size="14" font-weight="600">CPU</text>
         </svg>
-        <div class="sub" style="text-transform:uppercase; letter-spacing:0.8px;">CPU</div>
       </div>`;
     const arc = container.querySelector('#cpuArc');
     const txt = container.querySelector('#cpuPctText');
@@ -39,4 +42,3 @@ module.exports = {
     });
   }
 };
-

@@ -40,6 +40,7 @@ exports.init = function init(ctx) {
         './widgets/cpu',
         './widgets/gpu',
         './widgets/feed',
+        './widgets/launchpad',
       ].map(p => { try { return require(p); } catch { return null; } });
       mods.forEach(mod => {
         const def = (mod && (mod.default || mod)) || null;

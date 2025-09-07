@@ -20,7 +20,7 @@
       "autoStart": true
     }
   },
-  "theme": "auto",
+  "theme": "light",
   "refresh": {
     "metricsMs": 1500,
     "metricsMsApi": 1500,
@@ -51,14 +51,7 @@
       "url": "https://music.youtube.com/"
     },
     {
-      "id": "weather-3",
-      "type": "weather",
-      "label": "Weather",
-      "icon": "⛅",
-      "page": 1
-    },
-    {
-      "id": "web-4",
+      "id": "web-3",
       "type": "web",
       "label": "Ring",
       "icon": "❖",
@@ -82,13 +75,6 @@
             "row": 0
           },
           {
-            "type": "system",
-            "span": 2,
-            "col": 2,
-            "row": 0,
-            "rspan": 2
-          },
-          {
             "type": "digital-clock",
             "span": 1,
             "col": 5,
@@ -108,19 +94,26 @@
             "col": 1,
             "row": 0,
             "rspan": 1
+          },
+          {
+            "type": "launchpad",
+            "span": 2,
+            "col": 2,
+            "row": 0,
+            "rspan": 2
           }
         ],
         "split": true
       }
     ],
     "pageIndex": 0,
-    "navEnabled": true
+    "navEnabled": false
   },
   "background": {
     "mode": "windows"
   },
   "ui": {
-    "widgetGlassOpacity": 51,
+    "widgetGlassOpacity": 91,
     "widgetBackgroundVisible": true
   },
   "city": "Orlando, Florida"

@@ -38,6 +38,7 @@ exports.init = function init(ctx) {
         './widgets/weather',
         './widgets/system',
         './widgets/cpu',
+        './widgets/gpu',
         './widgets/feed',
       ].map(p => { try { return require(p); } catch { return null; } });
       mods.forEach(mod => {

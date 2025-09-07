@@ -84,14 +84,14 @@
           {
             "type": "system",
             "span": 1,
-            "col": 1,
-            "row": 1,
+            "col": 3,
+            "row": 0,
             "rspan": 1
           },
           {
             "type": "digital-clock",
             "span": 1,
-            "col": 3,
+            "col": 0,
             "row": 1,
             "rspan": 1
           },
@@ -103,7 +103,7 @@
             "rspan": 1
           },
           {
-            "type": "cpu",
+            "type": "gpu",
             "span": 1,
             "col": 1,
             "row": 0,
@@ -120,7 +120,7 @@
     "mode": "windows"
   },
   "ui": {
-    "widgetGlassOpacity": 76,
+    "widgetGlassOpacity": 51,
     "widgetBackgroundVisible": true
   }
 }

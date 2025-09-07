@@ -38,14 +38,14 @@
     {
       "id": "browser-1",
       "type": "browser",
-      "label": "App",
+      "label": "Browser",
       "icon": "🖥️",
       "page": 0
     },
     {
       "id": "web-2",
       "type": "web",
-      "label": "App",
+      "label": "Youtube Music",
       "icon": "🎵",
       "page": 0,
       "url": "https://music.youtube.com/"

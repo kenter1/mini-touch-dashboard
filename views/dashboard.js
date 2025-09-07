@@ -384,7 +384,8 @@ exports.init = function init(ctx) {
         ctrls.style.top = '8px';
         ctrls.style.right = '8px';
         ctrls.style.display = 'flex';
-        ctrls.style.gap = '10px';
+        ctrls.style.flexDirection = 'column';
+        ctrls.style.gap = '8px';
         ctrls.style.background = 'rgba(0,0,0,0.35)';
         ctrls.style.backdropFilter = 'blur(6px)';
         ctrls.style.padding = '6px 8px';
@@ -404,8 +405,17 @@ exports.init = function init(ctx) {
         full.onclick = (e) => { e.stopPropagation(); w.rspan = rows; w.row = 0; saveConfig(); render(); };
         del.onclick = (e) => { e.stopPropagation(); const arr = page.widgets || []; const i0 = arr.indexOf(w); if (i0 >= 0) arr.splice(i0,1); saveConfig(); render(); };
         hideBtn.onclick = (e) => { e.stopPropagation(); w.invisible = !isHidden; saveConfig(); render(); };
-        ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc);
-        if (rows>1){ ctrls.appendChild(half); ctrls.appendChild(full);} 
+        // Keep size controls in a horizontal row at the top
+        const sizeRow = document.createElement('div');
+        sizeRow.style.display = 'flex';
+        sizeRow.style.gap = '8px';
+        sizeRow.style.alignItems = 'center';
+        sizeRow.appendChild(dec);
+        sizeRow.appendChild(spanPill);
+        sizeRow.appendChild(inc);
+        ctrls.appendChild(sizeRow);
+        // Stack action buttons vertically beneath
+        if (rows > 1) { ctrls.appendChild(half); ctrls.appendChild(full); }
         ctrls.appendChild(hideBtn);
         ctrls.appendChild(del);
         card.appendChild(ctrls);

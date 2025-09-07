@@ -4,43 +4,49 @@ module.exports = {
   render(container, { config, addTimer }) {
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:12px;width:100%;">
-        <!-- Timer Section -->
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div id="timerDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;">00:00</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-            <button id="timerStart" class="small-btn" style="flex:1;min-width:80px;">Start</button>
-            <button id="timerStop" class="small-btn" style="flex:1;min-width:80px;">Stop</button>
-            <button id="timerReset" class="small-btn" style="flex:1;min-width:80px;">Reset</button>
+        <!-- Tab Navigation -->
+        <div style="display:flex;border-radius:8px;background:rgba(255,255,255,0.05);padding:4px;">
+          <button id="timerTab" class="small-btn" style="flex:1;padding:8px;font-size:14px;background:var(--accent);color:white;border-radius:6px;">Timer</button>
+          <button id="stopwatchTab" class="small-btn" style="flex:1;padding:8px;font-size:14px;background:transparent;color:var(--muted);border-radius:6px;">Stopwatch</button>
+        </div>
+        
+        <!-- Timer Content -->
+        <div id="timerContent" style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;justify-content:center;align-items:center;gap:8px;">
+            <button id="timerMute" class="small-btn" style="width:40px;font-size:18px;background:transparent;border:none;padding:8px;">🔊</button>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-            <button id="timerAdd30" class="small-btn" style="flex:1;min-width:60px;">+0:30</button>
-            <button id="timerAdd1" class="small-btn" style="flex:1;min-width:60px;">+1:00</button>
-            <button id="timerAdd5" class="small-btn" style="flex:1;min-width:60px;">+5:00</button>
+          <div id="timerDisplayContainer" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;cursor:pointer;user-select:none;padding:10px;border-radius:8px;min-width:120px;">
+            <span id="timerDisplay">00:00</span>
           </div>
-          <div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:4px;">
-            <span class="sub">Mute Alarm:</span>
-            <button id="timerMute" class="small-btn" style="width:60px;">On</button>
+          <div id="timerInputContainer" style="display:none;">
+            <div id="timerDigitDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;padding:10px;min-height:70px;">00:00</div>
+            <div style="text-align:center;margin-top:10px;color:var(--muted);font-size:14px;">Type digits on your keyboard</div>
+          </div>
+          <div id="timerControls" style="display:flex;gap:8px;margin-top:10px;">
+            <button id="timerMainBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;">▶</button>
+            <button id="timerResetBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;display:none;">↺</button>
           </div>
         </div>
         
-        <!-- Stopwatch Section -->
-        <div style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);">
-          <div id="stopwatchDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:36px; line-height:1;text-align:center;">00:00.00</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-            <button id="stopwatchStart" class="small-btn" style="flex:1;min-width:80px;">Start</button>
-            <button id="stopwatchStop" class="small-btn" style="flex:1;min-width:80px;">Stop</button>
-            <button id="stopwatchReset" class="small-btn" style="flex:1;min-width:80px;">Reset</button>
+        <!-- Stopwatch Content -->
+        <div id="stopwatchContent" style="display:none;flex-direction:column;gap:12px;">
+          <div id="stopwatchDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;margin:10px 0;">00:00.00</div>
+          <div id="stopwatchControls" style="display:flex;gap:8px;">
+            <button id="stopwatchMainBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;">▶</button>
+            <button id="stopwatchResetBtn" class="small-btn" style="flex:1;padding:16px;font-size:24px;display:none;">↺</button>
           </div>
         </div>
       </div>
     `;
 
     // Timer variables
+    let timerDigits = ["0", "0", "0", "0"]; // Stores the 4 digits [min1, min2, sec1, sec2]
     let timerSeconds = 0;
     let timerRunning = false;
     let timerInterval = null;
     let alarmPlaying = false;
     let alarmMuted = false;
+    let timerEditing = false;
     
     // Stopwatch variables
     let stopwatchMilliseconds = 0;
@@ -48,19 +54,22 @@ module.exports = {
     let stopwatchInterval = null;
     
     // DOM elements
+    const timerTab = container.querySelector('#timerTab');
+    const stopwatchTab = container.querySelector('#stopwatchTab');
+    const timerContent = container.querySelector('#timerContent');
+    const stopwatchContent = container.querySelector('#stopwatchContent');
+    
+    const timerDisplayContainer = container.querySelector('#timerDisplayContainer');
     const timerDisplay = container.querySelector('#timerDisplay');
-    const timerStartBtn = container.querySelector('#timerStart');
-    const timerStopBtn = container.querySelector('#timerStop');
-    const timerResetBtn = container.querySelector('#timerReset');
-    const timerAdd30Btn = container.querySelector('#timerAdd30');
-    const timerAdd1Btn = container.querySelector('#timerAdd1');
-    const timerAdd5Btn = container.querySelector('#timerAdd5');
+    const timerInputContainer = container.querySelector('#timerInputContainer');
+    const timerDigitDisplay = container.querySelector('#timerDigitDisplay');
+    const timerMainBtn = container.querySelector('#timerMainBtn');
+    const timerResetBtn = container.querySelector('#timerResetBtn');
     const timerMuteBtn = container.querySelector('#timerMute');
     
     const stopwatchDisplay = container.querySelector('#stopwatchDisplay');
-    const stopwatchStartBtn = container.querySelector('#stopwatchStart');
-    const stopwatchStopBtn = container.querySelector('#stopwatchStop');
-    const stopwatchResetBtn = container.querySelector('#stopwatchReset');
+    const stopwatchMainBtn = container.querySelector('#stopwatchMainBtn');
+    const stopwatchResetBtn = container.querySelector('#stopwatchResetBtn');
     
     // Format time functions
     function formatTimer(seconds) {
@@ -75,6 +84,20 @@ module.exports = {
       const secs = totalSeconds % 60;
       const ms = Math.floor((milliseconds % 1000) / 10);
       return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+    }
+    
+    // Format digits as MM:SS
+    function formatDigits(digits) {
+      return `${digits[0]}${digits[1]}:${digits[2]}${digits[3]}`;
+    }
+    
+    // Convert MM:SS format to seconds
+    function timeToSeconds(timeString) {
+      const parts = timeString.split(':');
+      if (parts.length !== 2) return 0;
+      const minutes = parseInt(parts[0]) || 0;
+      const seconds = parseInt(parts[1]) || 0;
+      return minutes * 60 + seconds;
     }
     
     // Update displays
@@ -92,13 +115,107 @@ module.exports = {
       stopwatchDisplay.textContent = formatStopwatch(stopwatchMilliseconds);
     }
     
+    // Update digit display
+    function updateTimerDigitDisplay() {
+      timerDigitDisplay.textContent = formatDigits(timerDigits);
+    }
+    
+    // Tab switching
+    function showTimer() {
+      timerTab.style.background = 'var(--accent)';
+      timerTab.style.color = 'white';
+      stopwatchTab.style.background = 'transparent';
+      stopwatchTab.style.color = 'var(--muted)';
+      timerContent.style.display = 'flex';
+      stopwatchContent.style.display = 'none';
+    }
+    
+    function showStopwatch() {
+      stopwatchTab.style.background = 'var(--accent)';
+      stopwatchTab.style.color = 'white';
+      timerTab.style.background = 'transparent';
+      timerTab.style.color = 'var(--muted)';
+      stopwatchContent.style.display = 'flex';
+      timerContent.style.display = 'none';
+    }
+    
+    // Timer editing functions
+    function showTimerInput() {
+      if (timerRunning) return; // Don't allow editing while running
+      
+      timerEditing = true;
+      timerDisplayContainer.style.display = 'none';
+      timerInputContainer.style.display = 'block';
+      
+      // Reset digits to zeros for fresh input
+      timerDigits = ["0", "0", "0", "0"];
+      updateTimerDigitDisplay();
+      
+      // Focus on the container to capture keyboard events
+      setTimeout(() => {
+        timerInputContainer.focus();
+      }, 0);
+    }
+    
+    function hideTimerInput() {
+      timerEditing = false;
+      timerDisplayContainer.style.display = 'block';
+      timerInputContainer.style.display = 'none';
+    }
+    
+    function saveTimerInput() {
+      // Convert digits to seconds
+      timerSeconds = timeToSeconds(formatDigits(timerDigits));
+      
+      updateTimerDisplay();
+      hideTimerInput();
+    }
+    
     // Timer functions
     function startTimer() {
-      if (timerRunning) return;
-      if (timerSeconds <= 0) return;
+      // If we're editing, save the input first
+      if (timerEditing) {
+        saveTimerInput();
+      }
+      
+      // Get current values if not running
+      if (!timerRunning) {
+        // Validate input
+        if (timerSeconds <= 0) return;
+      }
       
       timerRunning = true;
-      timerStartBtn.textContent = 'Pause';
+      timerMainBtn.textContent = '⏹';
+      timerResetBtn.style.display = 'block'; // Show reset button when running
+      timerDisplayContainer.style.cursor = 'default'; // Remove edit cursor when running
+    }
+    
+    function stopTimer() {
+      if (!timerRunning) return;
+      
+      timerRunning = false;
+      clearInterval(timerInterval);
+      timerInterval = null;
+      timerMainBtn.textContent = '▶';
+      timerDisplayContainer.style.cursor = 'pointer'; // Restore edit cursor when stopped
+    }
+    
+    function resetTimer() {
+      stopTimer();
+      // Reset to the input value
+      timerSeconds = timeToSeconds(formatDigits(timerDigits));
+      updateTimerDisplay();
+      timerDisplay.style.color = '';
+    }
+    
+    function toggleMute() {
+      alarmMuted = !alarmMuted;
+      timerMuteBtn.textContent = alarmMuted ? '🔇' : '🔊';
+    }
+    
+    // Start timer interval (separate function for better control)
+    function startTimerInterval() {
+      if (!timerRunning || timerInterval) return;
       
       timerInterval = setInterval(() => {
         timerSeconds--;
@@ -107,39 +224,11 @@ module.exports = {
         if (timerSeconds <= 0) {
           timerSeconds = 0;
           stopTimer();
+          clearInterval(timerInterval);
+          timerInterval = null;
           playAlarm();
         }
       }, 1000);
-    }
-    
-    function pauseTimer() {
-      if (!timerRunning) return;
-      
-      timerRunning = false;
-      clearInterval(timerInterval);
-      timerStartBtn.textContent = 'Start';
-    }
-    
-    function stopTimer() {
-      pauseTimer();
-      timerStartBtn.textContent = 'Start';
-    }
-    
-    function resetTimer() {
-      stopTimer();
-      timerSeconds = 0;
-      updateTimerDisplay();
-      timerDisplay.style.color = '';
-    }
-    
-    function addTime(seconds) {
-      timerSeconds += seconds;
-      updateTimerDisplay();
-    }
-    
-    function toggleMute() {
-      alarmMuted = !alarmMuted;
-      timerMuteBtn.textContent = alarmMuted ? 'Off' : 'On';
     }
     
     // Alarm function - using a more reliable method for Electron
@@ -190,7 +279,8 @@ module.exports = {
       if (stopwatchRunning) return;
       
       stopwatchRunning = true;
-      stopwatchStartBtn.textContent = 'Pause';
+      stopwatchMainBtn.textContent = '⏹';
+      stopwatchResetBtn.style.display = 'block'; // Show reset button when running
       
       const startTime = Date.now() - stopwatchMilliseconds;
       
@@ -200,17 +290,13 @@ module.exports = {
       }, 10);
     }
     
-    function pauseStopwatch() {
+    function stopStopwatch() {
       if (!stopwatchRunning) return;
       
       stopwatchRunning = false;
       clearInterval(stopwatchInterval);
-      stopwatchStartBtn.textContent = 'Start';
-    }
-    
-    function stopStopwatch() {
-      pauseStopwatch();
-      stopwatchStartBtn.textContent = 'Start';
+      stopwatchInterval = null;
+      stopwatchMainBtn.textContent = '▶';
     }
     
     function resetStopwatch() {
@@ -219,36 +305,98 @@ module.exports = {
       updateStopwatchDisplay();
     }
     
-    // Event listeners for timer
-    timerStartBtn.addEventListener('click', () => {
-      if (timerRunning) {
-        pauseTimer();
-      } else {
-        startTimer();
+    // Digit input handling (Google timer style with keyboard)
+    function addDigit(digit) {
+      // Shift digits left and add new digit at the end
+      timerDigits[0] = timerDigits[1];
+      timerDigits[1] = timerDigits[2];
+      timerDigits[2] = timerDigits[3];
+      timerDigits[3] = digit;
+      
+      updateTimerDigitDisplay();
+    }
+    
+    function clearDigits() {
+      timerDigits = ["0", "0", "0", "0"];
+      updateTimerDigitDisplay();
+    }
+    
+    // Keyboard event handling
+    function handleKeyboardInput(e) {
+      // Only handle when timer input is active
+      if (!timerEditing) return;
+      
+      // Prevent default for digit keys to avoid scrolling/page actions
+      if (/[0-9]/.test(e.key)) {
+        e.preventDefault();
+        addDigit(e.key);
+      } 
+      // Handle backspace
+      else if (e.key === 'Backspace') {
+        e.preventDefault();
+        // Shift digits right and add zero at the beginning
+        timerDigits[3] = timerDigits[2];
+        timerDigits[2] = timerDigits[1];
+        timerDigits[1] = timerDigits[0];
+        timerDigits[0] = "0";
+        updateTimerDigitDisplay();
+      }
+      // Handle escape to clear
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        clearDigits();
+      }
+    }
+    
+    // Click on timer display to edit (only when not running)
+    timerDisplayContainer.addEventListener('click', function() {
+      if (!timerRunning) {
+        showTimerInput();
       }
     });
     
-    timerStopBtn.addEventListener('click', stopTimer);
+    // Keyboard event listener
+    document.addEventListener('keydown', handleKeyboardInput);
+    
+    // Event listeners for tabs
+    timerTab.addEventListener('click', showTimer);
+    stopwatchTab.addEventListener('click', showStopwatch);
+    
+    // Event listeners for timer
+    timerMainBtn.addEventListener('click', () => {
+      if (timerRunning) {
+        stopTimer();
+      } else {
+        startTimer();
+        // Start the interval after a short delay to allow for input saving
+        setTimeout(() => {
+          if (timerRunning) {
+            startTimerInterval();
+          }
+        }, 10);
+      }
+    });
+    
     timerResetBtn.addEventListener('click', resetTimer);
-    timerAdd30Btn.addEventListener('click', () => addTime(30));
-    timerAdd1Btn.addEventListener('click', () => addTime(60));
-    timerAdd5Btn.addEventListener('click', () => addTime(300));
     timerMuteBtn.addEventListener('click', toggleMute);
     
     // Event listeners for stopwatch
-    stopwatchStartBtn.addEventListener('click', () => {
+    stopwatchMainBtn.addEventListener('click', () => {
       if (stopwatchRunning) {
-        pauseStopwatch();
+        stopStopwatch();
       } else {
         startStopwatch();
       }
     });
     
-    stopwatchStopBtn.addEventListener('click', stopStopwatch);
     stopwatchResetBtn.addEventListener('click', resetStopwatch);
     
     // Initialize displays
     updateTimerDisplay();
     updateStopwatchDisplay();
+    updateTimerDigitDisplay();
+    
+    // Show timer by default
+    showTimer();
   }
 };

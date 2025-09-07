@@ -112,6 +112,13 @@
             "col": 3,
             "row": 1,
             "rspan": 1
+          },
+          {
+            "type": "timer",
+            "span": 1,
+            "col": 3,
+            "row": 0,
+            "rspan": 1
           }
         ],
         "split": true

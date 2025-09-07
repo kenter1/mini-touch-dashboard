@@ -95,35 +95,28 @@ exports.init = function init(ctx) {
           <div class="kpi"><div class="label">Net Down</div><div class="val" id="dDown">-</div></div>
           <div class="kpi"><div class="label">Net Up</div><div class="val" id="dUp">-</div></div>
         </div>`;
-        let lastRx = 0, lastTx = 0, lastTime = 0;
-        async function poll() {
+        const metrics = require('./metricsService');
+        metrics.start(config);
+        const unsubscribe = metrics.subscribe((data) => {
           try {
-            const [load, mem, temp, net] = await Promise.all([
-              si.currentLoad(), si.mem(), si.cpuTemperature(), si.networkStats()
-            ]);
-            const cpu = Math.round(Number(load.currentload) || 0);
+            if (!document.body.contains(container)) { try { unsubscribe(); } catch {}; return; }
+            const cpu = Math.round(Number(data?.cpu?.loadPct) || 0);
             const dCpu = container.querySelector('#dCpu'); if (dCpu) dCpu.textContent = cpu + '%';
             const dCpuBar = container.querySelector('#dCpuBar'); if (dCpuBar) dCpuBar.style.width = Math.min(100, cpu) + '%';
-            const t = temp.main && temp.main > 0 ? Math.round(temp.main) : 0;
-            const dCpuT = container.querySelector('#dCpuT'); if (dCpuT) dCpuT.textContent = (t>0 ? t + DEG + 'C' : '-');
-            const used = mem.active || (mem.total - mem.available);
-            const memPct = Math.round((used / mem.total) * 100);
-            const dMem = container.querySelector('#dMem'); if (dMem) dMem.textContent = `${(used/(1024**3)).toFixed(1)} / ${(mem.total/(1024**3)).toFixed(1)} GB`;
+
+            const t = Number(data?.temps?.cpuC) || 0; const tDisp = t>0 ? Math.round(t) : 0;
+            const dCpuT = container.querySelector('#dCpuT'); if (dCpuT) dCpuT.textContent = (tDisp>0 ? tDisp + DEG + 'C' : '-');
+
+            const memTotal = Number(data?.mem?.total)||0; const memUsed = Number(data?.mem?.used)||0; const memPct = memTotal? Math.round((memUsed/memTotal)*100):0;
+            const dMem = container.querySelector('#dMem'); if (dMem) dMem.textContent = `${(memUsed/(1024**3)).toFixed(1)} / ${(memTotal/(1024**3)).toFixed(1)} GB`;
             const dMemBar = container.querySelector('#dMemBar'); if (dMemBar) dMemBar.style.width = Math.min(100, memPct) + '%';
-            const rx = net.reduce((a,n)=>a+n.rx_bytes,0);
-            const tx = net.reduce((a,n)=>a+n.tx_bytes,0);
-            const now = Date.now();
-            if (lastTime) {
-              const dt = (now - lastTime) / 1000;
-              const downBps = (rx - lastRx) * 8 / dt;
-              const upBps = (tx - lastTx) * 8 / dt;
-              const dDown = container.querySelector('#dDown'); if (dDown) dDown.textContent = formatBps(downBps);
-              const dUp = container.querySelector('#dUp'); if (dUp) dUp.textContent = formatBps(upBps);
-            }
-            lastRx = rx; lastTx = tx; lastTime = now;
+
+            const downBps = Math.max(0, Number(data?.net?.downBps)||0);
+            const upBps = Math.max(0, Number(data?.net?.upBps)||0);
+            const dDown = container.querySelector('#dDown'); if (dDown) dDown.textContent = formatBps(downBps);
+            const dUp = container.querySelector('#dUp'); if (dUp) dUp.textContent = formatBps(upBps);
           } catch {}
-        }
-        poll(); addTimer(setInterval(poll, (config.refresh && config.refresh.metricsMs) || 1500));
+        });
       }
     },
     feed: {

@@ -51,22 +51,14 @@
       "url": "https://music.youtube.com/"
     },
     {
-      "id": "chatgpt-3",
-      "type": "chatgpt",
-      "label": "ChatGPT",
-      "icon": "🤖",
-      "page": 0,
-      "url": "https://chatgpt.com"
-    },
-    {
-      "id": "weather-4",
+      "id": "weather-3",
       "type": "weather",
       "label": "Weather",
       "icon": "⛅",
       "page": 1
     },
     {
-      "id": "web-5",
+      "id": "web-4",
       "type": "web",
       "label": "Ring",
       "icon": "❖",
@@ -92,7 +84,7 @@
           {
             "type": "system",
             "span": 1,
-            "col": 3,
+            "col": 1,
             "row": 0,
             "rspan": 1
           },
@@ -102,19 +94,26 @@
             "col": 3,
             "row": 1,
             "rspan": 1
+          },
+          {
+            "type": "system",
+            "span": 1,
+            "col": 1,
+            "row": 1,
+            "rspan": 1
           }
         ],
         "split": true
       }
     ],
     "pageIndex": 0,
-    "navEnabled": false
+    "navEnabled": true
   },
   "background": {
     "mode": "windows"
   },
   "ui": {
-    "widgetGlassOpacity": 52,
-    "widgetBackgroundVisible": false
+    "widgetGlassOpacity": 76,
+    "widgetBackgroundVisible": true
   }
 }

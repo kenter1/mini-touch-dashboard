@@ -20,7 +20,7 @@
       "autoStart": true
     }
   },
-  "theme": "dark",
+  "theme": "auto",
   "refresh": {
     "metricsMs": 1500,
     "metricsMsApi": 1500,
@@ -77,8 +77,8 @@
           {
             "type": "weather",
             "span": 1,
-            "col": 2,
-            "rspan": 2,
+            "col": 5,
+            "rspan": 1,
             "row": 0
           },
           {
@@ -91,7 +91,7 @@
           {
             "type": "digital-clock",
             "span": 1,
-            "col": 0,
+            "col": 5,
             "row": 1,
             "rspan": 1
           },
@@ -122,5 +122,6 @@
   "ui": {
     "widgetGlassOpacity": 51,
     "widgetBackgroundVisible": true
-  }
+  },
+  "city": "Orlando, Florida"
 }

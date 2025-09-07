@@ -185,6 +185,25 @@ exports.init = function init(ctx) {
         </div>
 
         <div class="card" style="gap:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03);">
+          <div class="title"><span>Location & Weather</span></div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">City (display label)</div>
+            <input id="genCity" type="text" value="${(config.city||'').replace(/"/g,'&quot;')}" placeholder="e.g., Orlando, FL" style="width:100%; height:36px; font-size:15px; border-radius:8px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+            <div class="sub">Shown in the Weather widget. If empty, the app attempts to resolve your city automatically.</div>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+            <div>
+              <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Latitude</div>
+              <input id="genLat" type="number" step="0.0001" value="${Number.isFinite(config.latitude)?config.latitude:''}" placeholder="28.5383" style="width:100%; height:36px; font-size:15px; border-radius:8px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+            </div>
+            <div>
+              <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Longitude</div>
+              <input id="genLon" type="number" step="0.0001" value="${Number.isFinite(config.longitude)?config.longitude:''}" placeholder="-81.3792" style="width:100%; height:36px; font-size:15px; border-radius:8px; background:var(--card); color:var(--fg); border:1px solid rgba(255,255,255,0.12); padding:0 10px;">
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="gap:10px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03);">
           <div class="title"><span>Layout</span></div>
           <div>
             <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Sidebar Items Per Page</div>
@@ -493,6 +512,17 @@ exports.init = function init(ctx) {
       // widget background visibility (button updates config live; keep current value)
       const bgVis = (config.ui && config.ui.widgetBackgroundVisible);
       (config.ui = config.ui || {}).widgetBackgroundVisible = (bgVis !== false);
+
+      // location & weather
+      const cityEl = generalBox?.querySelector('#genCity');
+      const latEl = generalBox?.querySelector('#genLat');
+      const lonEl = generalBox?.querySelector('#genLon');
+      const cityVal = (cityEl?.value || '').trim();
+      if (cityVal) { config.city = cityVal; } else { delete config.city; }
+      const latVal = parseFloat(latEl?.value || '');
+      const lonVal = parseFloat(lonEl?.value || '');
+      if (Number.isFinite(latVal)) config.latitude = latVal;
+      if (Number.isFinite(lonVal)) config.longitude = lonVal;
 
       // collect apps
       config.apps = collectSettingsFromUI();

@@ -1,7 +1,9 @@
 ﻿<style>
   .dashboard-wrap { display:flex; flex-direction:column; height:100%; min-height:0; }
   #dashGrid { flex:1; min-height: 0; grid-template-rows: 1fr; position: relative; }
-  #dashGrid .card { height: 100%; }
+  #dashGrid .card { height: 90%; }
+  /* Ensure some extra space at the bottom of widgets to visually match top padding */
+  #dashGrid .card { padding-bottom: 0px; }
   #dashHeader { position: relative; z-index: 10000; }
   /* Show slot boxes during edit mode */
   #dashGrid .slot-outline {

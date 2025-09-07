@@ -20,7 +20,7 @@
       "autoStart": true
     }
   },
-  "theme": "light",
+  "theme": "dark",
   "refresh": {
     "metricsMs": 1500,
     "metricsMsApi": 1500,

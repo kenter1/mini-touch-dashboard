@@ -41,6 +41,13 @@
       user-select: none;
       overflow: hidden;
     }
+    /* Allow text selection and caret in form fields to keep touch keyboards working */
+    input, textarea, select, [contenteditable="true"] {
+      -webkit-user-select: text;
+      user-select: text;
+      -ms-user-select: text;
+      touch-action: manipulation;
+    }
     .app {
       position: relative;
       height: 100%;

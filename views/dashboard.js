@@ -218,12 +218,37 @@ exports.init = function init(ctx) {
 
     // Header controls
     const pageLabel = document.getElementById('dashPageLabel'); if (pageLabel) pageLabel.textContent = `Page ${pageIndex+1} / ${dash.pages.length}`;
+    // Add page dots navigation
+    const pageDots = document.getElementById('dashPageDots'); 
+    if (pageDots) {
+      pageDots.innerHTML = '';
+      for (let i = 0; i < dash.pages.length; i++) {
+        const dot = document.createElement('div');
+        dot.style.width = '8px';
+        dot.style.height = '8px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = i === pageIndex ? 'var(--accent)' : 'rgba(255,255,255,0.3)';
+        dot.style.cursor = 'pointer';
+        dot.title = `Go to page ${i+1}`;
+        dot.onclick = (e) => {
+          e.stopPropagation();
+          if (i !== pageIndex) {
+            pageIndex = i;
+            dash.pageIndex = pageIndex;
+            saveConfig();
+            render();
+          }
+        };
+        pageDots.appendChild(dot);
+      }
+    }
     const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
     const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
     const splitBtn = document.getElementById('dashToggleSplit'); if (splitBtn) splitBtn.textContent = `Split: ${page.split ? 'On' : 'Off'}`;
     // Page navigation controls
     const pagePrevBtn = document.getElementById('dashPagePrev'); if (pagePrevBtn) pagePrevBtn.disabled = pageIndex <= 0;
     const pageNextBtn = document.getElementById('dashPageNext'); if (pageNextBtn) pageNextBtn.disabled = pageIndex >= dash.pages.length - 1;
+    const pageRemoveBtn = document.getElementById('dashPageRemove'); if (pageRemoveBtn) pageRemoveBtn.disabled = dash.pages.length <= 1;
     // Ensure header controls are always interactive
     wireHeaderControls();
 
@@ -438,6 +463,34 @@ exports.init = function init(ctx) {
     }
     bind(document.getElementById('dashPagePrev'), () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } });
     bind(document.getElementById('dashPageNext'), () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } });
+    bind(document.getElementById('dashPageAdd'), () => { 
+      // Add a new page with default configuration
+      const newPage = {
+        columns: 3,
+        widgets: []
+      };
+      dash.pages.push(newPage);
+      pageIndex = dash.pages.length - 1;
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    });
+    bind(document.getElementById('dashPageRemove'), () => {
+      // Don't remove the last page
+      if (dash.pages.length <= 1) return;
+      
+      // Remove current page
+      dash.pages.splice(pageIndex, 1);
+      
+      // Adjust pageIndex if needed
+      if (pageIndex >= dash.pages.length) {
+        pageIndex = dash.pages.length - 1;
+      }
+      
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    });
     bind(document.getElementById('dashColsDec'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); });
     bind(document.getElementById('dashColsInc'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); });
     bind(document.getElementById('dashToggleEdit'), () => { editMode = !editMode; render(); });
@@ -459,6 +512,8 @@ exports.init = function init(ctx) {
           const split = el.closest && el.closest('#dashToggleSplit');
           const pagePrev = el.closest && el.closest('#dashPagePrev');
           const pageNext = el.closest && el.closest('#dashPageNext');
+          const pageAdd = el.closest && el.closest('#dashPageAdd');
+          const pageRemove = el.closest && el.closest('#dashPageRemove');
           if (dec) {
             e.stopPropagation();
             const p = dash.pages[pageIndex];
@@ -507,6 +562,38 @@ exports.init = function init(ctx) {
               saveConfig();
               render();
             }
+            return;
+          }
+          if (pageAdd) {
+            e.stopPropagation();
+            // Add a new page with default configuration
+            const newPage = {
+              columns: 3,
+              widgets: []
+            };
+            dash.pages.push(newPage);
+            pageIndex = dash.pages.length - 1;
+            dash.pageIndex = pageIndex;
+            saveConfig();
+            render();
+            return;
+          }
+          if (pageRemove) {
+            e.stopPropagation();
+            // Don't remove the last page
+            if (dash.pages.length <= 1) return;
+            
+            // Remove current page
+            dash.pages.splice(pageIndex, 1);
+            
+            // Adjust pageIndex if needed
+            if (pageIndex >= dash.pages.length) {
+              pageIndex = dash.pages.length - 1;
+            }
+            
+            dash.pageIndex = pageIndex;
+            saveConfig();
+            render();
             return;
           }
         } catch {}
@@ -581,6 +668,35 @@ exports.init = function init(ctx) {
     // Add page navigation functions
     window.dashPagePrev = () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } };
     window.dashPageNext = () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } };
+    // Add page management functions
+    window.dashPageAdd = () => {
+      // Add a new page with default configuration
+      const newPage = {
+        columns: 3,
+        widgets: []
+      };
+      dash.pages.push(newPage);
+      pageIndex = dash.pages.length - 1;
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    };
+    window.dashPageRemove = () => {
+      // Don't remove the last page
+      if (dash.pages.length <= 1) return;
+      
+      // Remove current page
+      dash.pages.splice(pageIndex, 1);
+      
+      // Adjust pageIndex if needed
+      if (pageIndex >= dash.pages.length) {
+        pageIndex = dash.pages.length - 1;
+      }
+      
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    };
   } catch {}
   exports.destroy = function destroy() { clearTimers(); };
 };

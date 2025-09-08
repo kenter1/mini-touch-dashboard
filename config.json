@@ -36,42 +36,12 @@
       "page": 0
     },
     {
-      "id": "dashboard-1",
-      "type": "dashboard",
-      "label": "Dashboard",
-      "icon": "🖥️",
-      "page": 0
-    },
-    {
-      "id": "web-2",
+      "id": "web-1",
       "type": "web",
       "label": "Music",
       "icon": "🎵",
       "page": 0,
       "url": "https://music.youtube.com/"
-    },
-    {
-      "id": "chatgpt-3",
-      "type": "chatgpt",
-      "label": "ChatGPT",
-      "icon": "🤖",
-      "page": 0,
-      "url": "https://chatgpt.com"
-    },
-    {
-      "id": "weather-4",
-      "type": "weather",
-      "label": "Weather",
-      "icon": "⛅",
-      "page": 0
-    },
-    {
-      "id": "web-5",
-      "type": "web",
-      "label": "Ring",
-      "icon": "❖",
-      "page": 1,
-      "url": "https://ring.com/"
     }
   ],
   "sidebar": {
@@ -140,6 +110,26 @@
               "col": 4,
               "row": 0,
               "rspan": 1
+            }
+          ],
+          "split": true
+        },
+        {
+          "columns": 5,
+          "widgets": [
+            {
+              "type": "feed",
+              "span": 1,
+              "col": 4,
+              "row": 0,
+              "rspan": 2
+            },
+            {
+              "type": "weather",
+              "span": 1,
+              "col": 3,
+              "row": 0,
+              "rspan": 2
             }
           ],
           "split": true

@@ -20,7 +20,6 @@ module.exports = {
           </div>
           <div id="timerInputContainer" style="display:none;">
             <div id="timerDigitDisplay" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight:800; letter-spacing:2px; font-size:48px; line-height:1;text-align:center;padding:10px;min-height:70px;">00:00:00</div>
-            <div style="text-align:center;margin-top:10px;color:var(--muted);font-size:14px;">Type digits on your keyboard (HH:MM:SS)</div>
           </div>
           <div id="timerQuickButtons" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
             <button id="timerAdd30" class="small-btn" style="flex:1;min-width:70px;padding:8px;font-size:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:var(--fg);">+0:30</button>
@@ -242,14 +241,38 @@ module.exports = {
     
     // Quick time addition functions
     function addTime(secondsToAdd) {
-      timerSeconds += secondsToAdd;
-      // Make sure we don't go negative
-      timerSeconds = Math.max(0, timerSeconds);
-      updateTimerDisplay();
-      
-      // If timer was at 0 and is now > 0, and it was running, restart it
-      if (timerRunning && timerSeconds > 0 && !timerInterval) {
-        startTimerInterval();
+      // If we're in input mode, update the digits directly
+      if (timerEditing) {
+        // Convert current digits to seconds
+        const currentSeconds = timeToSeconds(formatDigits(timerDigits));
+        let newSeconds = currentSeconds + secondsToAdd;
+        newSeconds = Math.max(0, newSeconds); // Ensure non-negative
+        
+        // Convert back to digits format (HH:MM:SS)
+        const hrs = Math.floor(newSeconds / 3600);
+        const mins = Math.floor((newSeconds % 3600) / 60);
+        const secs = newSeconds % 60;
+        
+        // Update digits array
+        timerDigits[0] = String(Math.floor(hrs / 10));
+        timerDigits[1] = String(hrs % 10);
+        timerDigits[2] = String(Math.floor(mins / 10));
+        timerDigits[3] = String(mins % 10);
+        timerDigits[4] = String(Math.floor(secs / 10));
+        timerDigits[5] = String(secs % 10);
+        
+        updateTimerDigitDisplay();
+      } else {
+        // Normal operation - update timer seconds
+        timerSeconds += secondsToAdd;
+        // Make sure we don't go negative
+        timerSeconds = Math.max(0, timerSeconds);
+        updateTimerDisplay();
+        
+        // If timer was at 0 and is now > 0, and it was running, restart it
+        if (timerRunning && timerSeconds > 0 && !timerInterval) {
+          startTimerInterval();
+        }
       }
     }
     
@@ -389,6 +412,11 @@ module.exports = {
       else if (e.key === 'Escape') {
         e.preventDefault();
         clearDigits();
+      }
+      // Handle Enter to save and close input
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        saveTimerInput();
       }
     }
     

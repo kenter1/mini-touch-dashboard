@@ -1,6 +1,6 @@
 ﻿// Dashboard: configurable widget grid with pages/slots
 exports.init = function init(ctx) {
-  const { config } = ctx;
+  const { config, appItem } = ctx;
   const path = require('path');
   const fs = require('fs');
   const { parseStringPromise } = require('xml2js');
@@ -12,14 +12,27 @@ exports.init = function init(ctx) {
   const addTimer = (id) => { if (id) timers.push(id); };
   function clearTimers() { try { timers.forEach(clearInterval); } catch {} timers = []; }
   let editMode = false;
-  const dash = (config.dashboard = config.dashboard || {});
+  
+  // Use app-specific dashboard config
+  const appId = appItem ? appItem.id : 'default';
+  const dashboards = (config.dashboards = config.dashboards || {});
+  const dash = (dashboards[appId] = dashboards[appId] || {});
   dash.pages = Array.isArray(dash.pages) && dash.pages.length ? dash.pages : [
     { columns: 3, widgets: [ { type:'clock', span: 1 }, { type:'weather', span: 1 }, { type:'system', span: 1 } ] }
   ];
   let pageIndex = Math.max(0, Math.min((dash.pageIndex|0)||0, dash.pages.length-1));
 
   function saveConfig() {
-    try { fs.writeFileSync(path.join(__dirname, '..', 'config.json'), JSON.stringify(config, null, 2)); } catch {}
+    try { 
+      // Make sure we're saving to the correct app-specific config
+      const appId = appItem ? appItem.id : 'default';
+      const dashboards = (config.dashboards = config.dashboards || {});
+      const dash = dashboards[appId];
+      if (dash) {
+        dash.pageIndex = pageIndex;
+      }
+      fs.writeFileSync(path.join(__dirname, '..', 'config.json'), JSON.stringify(config, null, 2)); 
+    } catch {}
   }
 
   // Helpers
@@ -208,6 +221,9 @@ exports.init = function init(ctx) {
     const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
     const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
     const splitBtn = document.getElementById('dashToggleSplit'); if (splitBtn) splitBtn.textContent = `Split: ${page.split ? 'On' : 'Off'}`;
+    // Page navigation controls
+    const pagePrevBtn = document.getElementById('dashPagePrev'); if (pagePrevBtn) pagePrevBtn.disabled = pageIndex <= 0;
+    const pageNextBtn = document.getElementById('dashPageNext'); if (pageNextBtn) pageNextBtn.disabled = pageIndex >= dash.pages.length - 1;
     // Ensure header controls are always interactive
     wireHeaderControls();
 
@@ -333,9 +349,9 @@ exports.init = function init(ctx) {
         const half = mkBtn('½', 'Half height');
         const full = mkBtn('1', 'Full height');
         const del = mkBtn('x', 'Remove');
-        dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Number(w.span||1) - 1); saveConfig(); render(); };
-        inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, Number(w.span||1) + 1); saveConfig(); render(); };
-        half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min((w.row|0), rows-1)); saveConfig(); render(); } };
+        dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Math.min(cols, Number(w.span||1) - 1)); saveConfig(); render(); };
+        inc.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Math.min(cols, Number(w.span||1) + 1)); saveConfig(); render(); };
+        half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min(Number(w.row||0), rows-1)); saveConfig(); render(); } };
         full.onclick = (e) => { e.stopPropagation(); w.rspan = rows; w.row = 0; saveConfig(); render(); };
         del.onclick = (e) => { e.stopPropagation(); const arr = page.widgets || []; const i0 = arr.indexOf(w); if (i0 >= 0) arr.splice(i0,1); saveConfig(); render(); };
         ctrls.appendChild(dec); ctrls.appendChild(spanPill); ctrls.appendChild(inc); if (rows>1){ ctrls.appendChild(half); ctrls.appendChild(full);} ctrls.appendChild(del);
@@ -346,6 +362,69 @@ exports.init = function init(ctx) {
       grid.appendChild(card);
       if (def && typeof def.render === 'function') def.render(body, { config, addTimer }); else body.textContent = `Unknown widget: ${w.type}`;
     });
+
+    // Add swipe navigation support
+    const gridContainer = document.querySelector('.dashboard-wrap');
+    if (gridContainer) {
+      // Remove existing event listeners to avoid duplicates
+      gridContainer.removeEventListener('touchstart', handleSwipeStart);
+      gridContainer.removeEventListener('touchmove', handleSwipeMove);
+      gridContainer.removeEventListener('touchend', handleSwipeEnd);
+      
+      // Add swipe event listeners
+      gridContainer.addEventListener('touchstart', handleSwipeStart, { passive: true });
+      gridContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
+      gridContainer.addEventListener('touchend', handleSwipeEnd, { passive: true });
+    }
+  }
+
+  // Swipe navigation for pages
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let isSwiping = false;
+  
+  function handleSwipeStart(e) {
+    if (e.touches.length > 1) return; // Ignore multi-touch
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isSwiping = true;
+  }
+  
+  function handleSwipeMove(e) {
+    if (!isSwiping || e.touches.length > 1) return;
+    
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    const diffX = touchX - touchStartX;
+    const diffY = touchY - touchStartY;
+    
+    // Check if it's a clear horizontal swipe
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      e.preventDefault(); // Prevent scrolling during swipe
+      
+      if (diffX > 0) {
+        // Swipe right - go to previous page
+        if (pageIndex > 0) {
+          pageIndex = Math.max(0, pageIndex - 1);
+          dash.pageIndex = pageIndex;
+          saveConfig();
+          render();
+        }
+      } else if (diffX < 0) {
+        // Swipe left - go to next page
+        if (pageIndex < dash.pages.length - 1) {
+          pageIndex = Math.min(dash.pages.length - 1, pageIndex + 1);
+          dash.pageIndex = pageIndex;
+          saveConfig();
+          render();
+        }
+      }
+      isSwiping = false;
+    }
+  }
+  
+  function handleSwipeEnd() {
+    isSwiping = false;
   }
 
   // Wire controls (ensure bindings persist and can't be blocked by overlays)
@@ -357,6 +436,8 @@ exports.init = function init(ctx) {
       el.addEventListener('click', (e) => { e.stopPropagation(); handler(e); }, true); // capture
       el.dataset.bound = '1';
     }
+    bind(document.getElementById('dashPagePrev'), () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } });
+    bind(document.getElementById('dashPageNext'), () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } });
     bind(document.getElementById('dashColsDec'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); });
     bind(document.getElementById('dashColsInc'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); });
     bind(document.getElementById('dashToggleEdit'), () => { editMode = !editMode; render(); });
@@ -376,6 +457,8 @@ exports.init = function init(ctx) {
           const inc = el.closest && el.closest('#dashColsInc');
           const tog = el.closest && el.closest('#dashToggleEdit');
           const split = el.closest && el.closest('#dashToggleSplit');
+          const pagePrev = el.closest && el.closest('#dashPagePrev');
+          const pageNext = el.closest && el.closest('#dashPageNext');
           if (dec) {
             e.stopPropagation();
             const p = dash.pages[pageIndex];
@@ -404,6 +487,26 @@ exports.init = function init(ctx) {
             p.split = !p.split;
             saveConfig();
             render();
+            return;
+          }
+          if (pagePrev) {
+            e.stopPropagation();
+            if (pageIndex > 0) {
+              pageIndex--;
+              dash.pageIndex = pageIndex;
+              saveConfig();
+              render();
+            }
+            return;
+          }
+          if (pageNext) {
+            e.stopPropagation();
+            if (pageIndex < dash.pages.length - 1) {
+              pageIndex++;
+              dash.pageIndex = pageIndex;
+              saveConfig();
+              render();
+            }
             return;
           }
         } catch {}
@@ -475,6 +578,9 @@ exports.init = function init(ctx) {
     window.dashColsInc = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
     window.dashToggleEdit = () => { editMode = !editMode; render(); };
     window.dashToggleSplit = () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); };
+    // Add page navigation functions
+    window.dashPagePrev = () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } };
+    window.dashPageNext = () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } };
   } catch {}
   exports.destroy = function destroy() { clearTimers(); };
 };

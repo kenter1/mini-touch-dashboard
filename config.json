@@ -36,9 +36,9 @@
       "page": 0
     },
     {
-      "id": "system-1",
-      "type": "system",
-      "label": "System",
+      "id": "dashboard-1",
+      "type": "dashboard",
+      "label": "Dashboard",
       "icon": "🖥️",
       "page": 0
     },
@@ -84,46 +84,68 @@
         "columns": 4,
         "widgets": [
           {
-            "type": "clock",
-            "span": 1
-          },
-          {
-            "type": "weather",
-            "span": 1,
-            "col": 4
-          },
-          {
             "type": "digital-clock",
             "span": 1,
-            "col": 1,
-            "rspan": 1,
-            "row": 0
-          },
-          {
-            "type": "clock",
-            "span": 1,
-            "col": 2,
-            "row": 1,
-            "rspan": 1
-          },
-          {
-            "type": "timer",
-            "span": 2,
             "col": 3,
             "row": 1,
             "rspan": 1
           },
           {
-            "type": "timer",
+            "type": "feed",
             "span": 1,
             "col": 3,
             "row": 0,
-            "rspan": 2
+            "rspan": 1
           }
         ],
         "split": true
       }
     ],
     "pageIndex": 0
+  },
+  "dashboards": {
+    "dashboard-0": {
+      "pages": [
+        {
+          "columns": 3,
+          "widgets": [
+            {
+              "type": "clock",
+              "span": 1
+            },
+            {
+              "type": "weather",
+              "span": 1
+            }
+          ]
+        }
+      ]
+    },
+    "default": {
+      "pages": [
+        {
+          "columns": 4,
+          "widgets": [
+            {
+              "type": "clock",
+              "span": 1
+            },
+            {
+              "type": "weather",
+              "span": 1
+            },
+            {
+              "type": "timer",
+              "span": 1,
+              "col": 4,
+              "row": 0,
+              "rspan": 1
+            }
+          ],
+          "split": true
+        }
+      ],
+      "pageIndex": 0
+    }
   }
 }

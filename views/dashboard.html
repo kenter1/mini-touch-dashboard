@@ -25,6 +25,10 @@
       <div class="title">Dashboard</div>
       <div class="row" id="dashControls" style="gap:8px;">
         <div style="width:12px;"></div>
+        <button class="small-btn" id="dashPagePrev" onclick="window.dashPagePrev && window.dashPagePrev()" title="Previous Page">&larr;</button>
+        <div class="pill" id="dashPageLabel">Page 1 / 1</div>
+        <button class="small-btn" id="dashPageNext" onclick="window.dashPageNext && window.dashPageNext()" title="Next Page">&rarr;</button>
+        <div style="width:12px;"></div>
         <button class="small-btn" id="dashColsDec" onclick="window.dashColsDec && window.dashColsDec()">- Col</button>
         <div class="pill" id="dashColsLabel">3 cols</div>
         <button class="small-btn" id="dashColsInc" onclick="window.dashColsInc && window.dashColsInc()">+ Col</button>

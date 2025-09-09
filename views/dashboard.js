@@ -389,7 +389,7 @@ exports.init = function init(ctx) {
       grid.appendChild(card);
       card.appendChild(body);
       grid.appendChild(card);
-      if (def && typeof def.render === 'function') def.render(body, { config, addTimer, editMode }); else body.textContent = `Unknown widget: ${w.type}`;
+      if (def && typeof def.render === 'function') def.render(body, { config, addTimer, editMode, widget: w, saveConfig, render }); else body.textContent = `Unknown widget: ${w.type}`;
     });
 
     // Add swipe navigation support

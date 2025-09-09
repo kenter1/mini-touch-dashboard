@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IFrame Widget Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        button {
+            background: #4da3ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #3a8bd9;
+        }
+        .preview {
+            margin-top: 20px;
+            min-height: 300px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 10px;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>IFrame Widget Test</h1>
+        
+        <div class="test-section">
+            <h2>Test 1: Regular URL</h2>
+            <p>Enter a website URL to test loading in an iframe:</p>
+            <input type="text" id="urlInput" value="https://example.com" style="width: 100%; padding: 10px; margin: 10px 0;" />
+            <button onclick="loadUrl()">Load URL</button>
+            <div class="preview" id="urlPreview"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test 2: HTML IFrame Code</h2>
+            <p>Paste HTML iframe code to test embedding:</p>
+            <textarea id="htmlInput"><div style="height:433px; background-color: #FFFFFF; overflow:hidden; box-sizing: border-box; border: 1px solid #56667F; border-radius: 4px; text-align: right; line-height:14px; font-size: 12px; font-feature-settings: normal; text-size-adjust: 100%; box-shadow: inset 0 -20px 0 0 #56667F; padding: 0px; margin: 0px; width: 100%;"><div style="height:413px; padding:0px; margin:0px; width: 100%;"><iframe src="https://widget.coinlib.io/widget?type=full_v2&theme=light&cnt=6&pref_coin_id=1505&graph=yes" width="100%" height="409px" scrolling="auto" marginwidth="0" marginheight="0" frameborder="0" border="0" style="border:0;margin:0;padding:0;"></iframe></div><div style="color: #FFFFFF; line-height: 14px; font-weight: 400; font-size: 11px; box-sizing: border-box; padding: 2px 6px; width: 100%; font-family: Verdana, Tahoma, Arial, sans-serif;"><a href="https://coinlib.io" target="_blank" style="font-weight: 500; color: #FFFFFF; text-decoration:none; font-size:11px">Cryptocurrency Prices</a>&nbsp;by Coinlib</div></div></textarea>
+            <button onclick="loadHtml()">Load HTML</button>
+            <div class="preview" id="htmlPreview"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test 3: Script-based Widget</h2>
+            <p>Paste script-based widget code to test embedding:</p>
+            <textarea id="scriptInput"><script src="https://widgets.coingecko.com/gecko-coin-heatmap-widget.js"></script>
+<gecko-coin-heatmap-widget locale="en" dark-mode="true" transparent-background="true" top="15"></gecko-coin-heatmap-widget></textarea>
+            <button onclick="loadScript()">Load Script Widget</button>
+            <div class="preview" id="scriptPreview"></div>
+        </div>
+    </div>
+
+    <script>
+        function loadUrl() {
+            const url = document.getElementById('urlInput').value;
+            const preview = document.getElementById('urlPreview');
+            preview.innerHTML = `<iframe src="${url}" width="100%" height="400" frameborder="0"></iframe>`;
+        }
+        
+        function loadHtml() {
+            const html = document.getElementById('htmlInput').value;
+            const preview = document.getElementById('htmlPreview');
+            // Create a container div and set its innerHTML to the provided HTML
+            const container = document.createElement('div');
+            container.style.width = '100%';
+            container.style.height = '400px';
+            container.innerHTML = html;
+            preview.innerHTML = '';
+            preview.appendChild(container);
+        }
+        
+        function loadScript() {
+            const html = document.getElementById('scriptInput').value;
+            const preview = document.getElementById('scriptPreview');
+            // Create the HTML content with proper structure
+            const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Widget</title>
+</head>
+<body style="margin:0; padding:0;">
+    ${html}
+</body>
+</html>`;
+            
+            // Create a data URI
+            const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
+            preview.innerHTML = `<iframe src="${dataUri}" width="100%" height="400" frameborder="0"></iframe>`;
+        }
+        
+        // Load initial examples
+        window.onload = function() {
+            loadUrl();
+            loadHtml();
+            loadScript();
+        };
+    </script>
+</body>
+</html>

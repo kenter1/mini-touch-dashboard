@@ -345,7 +345,11 @@ exports.init = function init(ctx) {
       const card = document.createElement('div');
       card.className = 'card';
       card.style.gridColumn = `${startC + 1} / span ${span}`;
-      card.style.gridRow = `${startR + 1} / span ${rspan || rows}`;
+      card.style.gridRow = `${startR + 1} / span ${rspan}`;
+      // Ensure proper height handling for iframe widgets
+      if (w.type === 'iframe') {
+        card.style.height = '100%';
+      }
       if (editMode) {
         // Overlay outline (non-blocking)
         card.style.position = 'relative';

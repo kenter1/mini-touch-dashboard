@@ -18,7 +18,7 @@ module.exports = {
     let webViewSrc = settings.src || 'about:blank';
     if (webViewSrc !== 'about:blank' && !webViewSrc.startsWith('http://') && !webViewSrc.startsWith('https://') && !webViewSrc.startsWith('file://')) {
       // Handle localhost URLs without protocol
-      if (webViewSrc.startsWith('localhost') || webViewSrc.match(/^[\d\.]+(:\d+)?/)) {
+      if (webViewSrc.startsWith('localhost') || webViewSrc.match(/^[\\d\\.]+(:\\d+)?/)) {
         webViewSrc = 'http://' + webViewSrc;
       } else {
         webViewSrc = 'https://' + webViewSrc;
@@ -37,7 +37,7 @@ module.exports = {
     ` : ''}
     <div style="flex:1 1 auto;min-height:0;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="webview-host card">
       <webview id="${webViewId}" src="${webViewSrc}"
-        style="position:absolute;inset:0;display:block;width:100%;height:100%;border:0;outline:none;"
+        style="position:absolute;inset:0;display:block;width:100%;height:100%;border:0;outline:none;box-sizing:border-box;"
         allowpopups allowfullscreen>
       </webview>
     </div>
@@ -59,7 +59,6 @@ module.exports = {
   </div>
 `;
 
-    
     // Add event listeners after a short delay to ensure DOM is ready
     setTimeout(() => {
       const webview = document.getElementById(webViewId);

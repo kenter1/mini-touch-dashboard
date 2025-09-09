@@ -198,7 +198,9 @@ exports.init = function init(ctx) {
             const id = String(def.id || file.replace(/\.js$/i, ''));
             if (!id || loaded.has(id)) continue;
             if (typeof def.render !== 'function') continue;
-            widgets[id] = { title: def.title || id, render: def.render };
+            // Special handling for iframe widget to show it can handle HTML content
+            const title = (id === 'iframe') ? 'IFrame/HTML' : (def.title || id);
+            widgets[id] = { title, render: def.render };
             loaded.add(id);
           } catch {}
         }
@@ -385,7 +387,9 @@ exports.init = function init(ctx) {
       const body = document.createElement('div');
       card.appendChild(body);
       grid.appendChild(card);
-      if (def && typeof def.render === 'function') def.render(body, { config, addTimer }); else body.textContent = `Unknown widget: ${w.type}`;
+      card.appendChild(body);
+      grid.appendChild(card);
+      if (def && typeof def.render === 'function') def.render(body, { config, addTimer, editMode }); else body.textContent = `Unknown widget: ${w.type}`;
     });
 
     // Add swipe navigation support
@@ -514,6 +518,29 @@ exports.init = function init(ctx) {
           const pageNext = el.closest && el.closest('#dashPageNext');
           const pageAdd = el.closest && el.closest('#dashPageAdd');
           const pageRemove = el.closest && el.closest('#dashPageRemove');
+          
+          // Handle page navigation buttons with higher priority
+          if (pagePrev) {
+            e.stopPropagation();
+            if (pageIndex > 0) {
+              pageIndex--;
+              dash.pageIndex = pageIndex;
+              saveConfig();
+              render();
+            }
+            return;
+          }
+          if (pageNext) {
+            e.stopPropagation();
+            if (pageIndex < dash.pages.length - 1) {
+              pageIndex++;
+              dash.pageIndex = pageIndex;
+              saveConfig();
+              render();
+            }
+            return;
+          }
+          
           if (dec) {
             e.stopPropagation();
             const p = dash.pages[pageIndex];
@@ -542,26 +569,6 @@ exports.init = function init(ctx) {
             p.split = !p.split;
             saveConfig();
             render();
-            return;
-          }
-          if (pagePrev) {
-            e.stopPropagation();
-            if (pageIndex > 0) {
-              pageIndex--;
-              dash.pageIndex = pageIndex;
-              saveConfig();
-              render();
-            }
-            return;
-          }
-          if (pageNext) {
-            e.stopPropagation();
-            if (pageIndex < dash.pages.length - 1) {
-              pageIndex++;
-              dash.pageIndex = pageIndex;
-              saveConfig();
-              render();
-            }
             return;
           }
           if (pageAdd) {

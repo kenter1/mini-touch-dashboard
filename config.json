@@ -94,27 +94,6 @@
     "default": {
       "pages": [
         {
-          "columns": 4,
-          "widgets": [
-            {
-              "type": "clock",
-              "span": 1
-            },
-            {
-              "type": "weather",
-              "span": 1
-            },
-            {
-              "type": "timer",
-              "span": 1,
-              "col": 4,
-              "row": 0,
-              "rspan": 1
-            }
-          ],
-          "split": true
-        },
-        {
           "columns": 5,
           "widgets": [
             {
@@ -130,12 +109,51 @@
               "col": 3,
               "row": 0,
               "rspan": 2
+            },
+            {
+              "type": "iframe",
+              "span": 2,
+              "col": 0,
+              "row": 0,
+              "rspan": 2
             }
           ],
           "split": true
+        },
+        {
+          "columns": 3,
+          "widgets": [
+            {
+              "type": "iframe",
+              "span": 2,
+              "col": 0,
+              "row": 0,
+              "rspan": 1
+            },
+            {
+              "type": "weather",
+              "span": 1,
+              "col": 2,
+              "row": 0,
+              "rspan": 2
+            }
+          ],
+          "split": true
+        },
+        {
+          "columns": 3,
+          "widgets": [
+            {
+              "type": "iframe",
+              "span": 3,
+              "col": 0,
+              "row": 0,
+              "rspan": 1
+            }
+          ]
         }
       ],
-      "pageIndex": 0
+      "pageIndex": 2
     }
   }
 }

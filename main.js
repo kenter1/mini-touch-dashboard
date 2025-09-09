@@ -85,7 +85,7 @@ function createWindow() {
 
   win.loadFile('index.html');
   // Uncomment to debug layout the first time:
-  // win.webContents.openDevTools({ mode: 'detach' });
+  win.webContents.openDevTools({ mode: 'detach' });
 
   // Create a tray icon with basic controls (tolerate missing/invalid icon)
   try {

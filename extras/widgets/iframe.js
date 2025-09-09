@@ -37,7 +37,7 @@ module.exports = {
     ` : ''}
     <div style="flex:1 1 auto;min-height:0;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="webview-host card">
       <webview id="${webViewId}" src="${webViewSrc}"
-        style="position:absolute;inset:0;display:block;width:100%;height:100%;border:0;outline:none;box-sizing:border-box;"
+        style=""
         allowpopups allowfullscreen>
       </webview>
     </div>

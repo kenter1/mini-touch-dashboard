@@ -111,11 +111,18 @@
               "rspan": 2
             },
             {
-              "type": "iframe",
-              "span": 2,
-              "col": 0,
+              "type": "digital-clock",
+              "span": 1,
+              "col": 2,
               "row": 0,
-              "rspan": 2
+              "rspan": 1
+            },
+            {
+              "type": "timer",
+              "span": 1,
+              "col": 1,
+              "row": 0,
+              "rspan": 1
             }
           ],
           "split": true

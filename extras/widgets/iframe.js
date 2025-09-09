@@ -29,32 +29,36 @@ module.exports = {
     const webViewId = 'webView-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
     
     container.innerHTML = `
-      <div style="display:flex;flex-direction:column;width:600px;height:700px;">
-        ${editMode ? `
-        <div style="display:flex;justify-content:center;margin:4px 0;">
-          <button class="small-btn" id="editIframeBtn-${webViewId}" style="padding:4px 8px;font-size:12px;z-index:100;position:relative;">✏️ Edit</button>
+  <div style="display:flex;flex-direction:column;width:100%;height:100%;min-height:0;">
+    ${editMode ? `
+    <div style="display:flex;justify-content:center;margin:4px 0;flex:0 0 auto;">
+      <button class="small-btn" id="editIframeBtn-${webViewId}" style="padding:4px 8px;font-size:12px;z-index:100;position:relative;">✏️ Edit</button>
+    </div>
+    ` : ''}
+    <div style="flex:1 1 auto;min-height:0;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="webview-host card">
+      <webview id="${webViewId}" src="${webViewSrc}"
+        style="position:absolute;inset:0;display:block;width:100%;height:100%;border:0;outline:none;"
+        allowpopups allowfullscreen>
+      </webview>
+    </div>
+    ${editMode ? `
+    <div id="iframeEditPanel-${webViewId}" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:90%;max-width:500px;max-height:80%;overflow:auto;padding:12px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.3);z-index:1000;">
+      <div style="margin-bottom:8px;font-weight:bold;">Edit WebView Settings</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <label style="display:block;margin-bottom:4px;font-size:12px;">URL:</label>
+          <input type="text" id="iframeSrc-${webViewId}" value="${webViewSrc}" placeholder="https://example.com" style="width:100%;padding:6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:var(--card);color:var(--fg);">
         </div>
-        ` : ''}
-        <div style="flex:1;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="webview-host card">
-          <webview id="${webViewId}" src="${webViewSrc}" style="position:absolute;top:0;left:0;width:600px;height:1000px;display:block;" allowpopups allowfullscreen></webview>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="small-btn" id="iframeSaveBtn-${webViewId}" style="flex:1;">💾 Save</button>
+          <button class="small-btn" id="iframeCancelBtn-${webViewId}" style="flex:1;">❌ Cancel</button>
         </div>
-        ${editMode ? `
-        <div id="iframeEditPanel-${webViewId}" style="display:none;position:absolute;transform:translate(-50%,-50%);width:90%;max-width:500px;max-height:80%;overflow:auto;padding:12px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.3);z-index:1000;">
-          <div style="margin-bottom:8px;font-weight:bold;">Edit WebView Settings</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <div>
-              <label style="display:block;margin-bottom:4px;font-size:12px;">URL:</label>
-              <input type="text" id="iframeSrc-${webViewId}" value="${webViewSrc}" placeholder="https://example.com" style="width:100%;padding:6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:var(--card);color:var(--fg);">
-            </div>
-            <div style="display:flex;gap:8px;margin-top:8px;">
-              <button class="small-btn" id="iframeSaveBtn-${webViewId}" style="flex:1;">💾 Save</button>
-              <button class="small-btn" id="iframeCancelBtn-${webViewId}" style="flex:1;">❌ Cancel</button>
-            </div>
-          </div>
-        </div>
-        ` : ''}
       </div>
-    `;
+    </div>
+    ` : ''}
+  </div>
+`;
+
     
     // Add event listeners after a short delay to ensure DOM is ready
     setTimeout(() => {

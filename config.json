@@ -128,7 +128,7 @@
               "span": 2,
               "col": 0,
               "row": 0,
-              "rspan": 2,
+              "rspan": 1,
               "config": {
                 "src": "https://www.reddit.com/",
                 "width": "100%",
@@ -140,7 +140,7 @@
               "span": 1,
               "col": 2,
               "row": 0,
-              "rspan": 2
+              "rspan": 1
             }
           ],
           "split": true
@@ -165,7 +165,7 @@
               "span": 1,
               "col": 1,
               "row": 0,
-              "rspan": 2,
+              "rspan": 1,
               "config": {
                 "src": "file:///C:/Projects/Dashboard/mini-touch-dashboard/simple-test.html",
                 "width": "100%",

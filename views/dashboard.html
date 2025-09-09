@@ -18,6 +18,20 @@
     color: rgba(255,255,255,0.35);
     background: rgba(255,255,255,0.03);
   }
+  /* Make cards a flex column and allow children to shrink */
+#dashGrid .card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;        /* IMPORTANT for nested flex/grids */
+  overflow: hidden;     /* optional, keeps rounded corners tidy */
+}
+
+/* The immediate body that widgets render into should flex */
+#dashGrid .card > div {
+  flex: 1 1 auto;
+  min-height: 0;        /* prevents half-render when content is larger */
+}
+
 </style>
 <div class="dashboard-wrap">
   <div class="card" id="dashHeader" style="margin-bottom: 8px;">

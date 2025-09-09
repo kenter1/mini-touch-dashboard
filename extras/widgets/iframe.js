@@ -31,13 +31,13 @@ module.exports = {
     container.innerHTML = `
   <div style="display:flex;flex-direction:column;width:100%;height:100%;min-height:0;">
     ${editMode ? `
-    <div style="display:flex;justify-content:center;margin:4px 0;flex:0 0 auto;">
-      <button class="small-btn" id="editIframeBtn-${webViewId}" style="padding:4px 8px;font-size:12px;z-index:100;position:relative;">✏️ Edit</button>
+    <div style="display:flex;justify-content:center;margin:0px 0;flex:0 0 auto;">
+      <button class="small-btn" id="editIframeBtn-${webViewId}" style="padding:0px 0px;font-size:12px;z-index:100;position:relative;">✏️ Edit</button>
     </div>
     ` : ''}
-    <div style="flex:1 1 auto;min-height:0;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="webview-host card">
+    <div style="flex:1 1 auto;min-height:0;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="card">
       <webview id="${webViewId}" src="${webViewSrc}"
-        style=""
+        style="width:100%; height:100%; position:absolute; inset:0; z-index:1;"
         allowpopups allowfullscreen>
       </webview>
     </div>

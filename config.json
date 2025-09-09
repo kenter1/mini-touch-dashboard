@@ -135,7 +135,7 @@
               "span": 2,
               "col": 0,
               "row": 0,
-              "rspan": 1,
+              "rspan": 2,
               "config": {
                 "src": "https://www.reddit.com/",
                 "width": "100%",
@@ -157,7 +157,7 @@
           "widgets": [
             {
               "type": "iframe",
-              "span": 1,
+              "span": 3,
               "col": 0,
               "row": 0,
               "rspan": 2,
@@ -166,22 +166,12 @@
                 "width": "100%",
                 "height": "100%"
               }
-            },
-            {
-              "type": "iframe",
-              "span": 2,
-              "col": 1,
-              "row": 0,
-              "rspan": 2,
-              "config": {
-                "src": "youtube.com"
-              }
             }
           ],
           "split": true
         }
       ],
-      "pageIndex": 2
+      "pageIndex": 0
     }
   }
 }

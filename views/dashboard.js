@@ -105,7 +105,21 @@ exports.init = function init(ctx) {
     const grid = document.getElementById('dashGrid'); if (!grid) return;
     const page = dash.pages[pageIndex] || { columns: 3, widgets: [] };
     const cols = Math.max(1, Math.min(6, Number(page.columns) || 3));
-    const rows = page.split ? 2 : 1;
+    let rows = page.split ? 2 : 1;
+    // In edit mode, avoid widgets "disappearing" when reducing columns by
+    // auto-expanding the grid rows to fit all widgets (when not explicitly split).
+    if (editMode && !page.split) {
+      try {
+        const items = Array.isArray(page.widgets) ? page.widgets : [];
+        let spanSum = 0;
+        for (const w of items) {
+          const s = Math.max(1, Math.min(cols, Number(w && w.span) || 1));
+          spanSum += s;
+        }
+        const needed = Math.max(1, Math.ceil(spanSum / cols));
+        rows = Math.max(rows, needed);
+      } catch {}
+    }
     // If nav is disabled, force edit off and hide header later
     if (dash.navEnabled === false && editMode) editMode = false;
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
@@ -130,10 +144,9 @@ exports.init = function init(ctx) {
         dot.onclick = (e) => {
           e.stopPropagation();
           if (i !== pageIndex) {
-            pageIndex = i;
-            dash.pageIndex = pageIndex;
-            saveConfig();
-            render();
+            // Use slide animation with direction awareness
+            const dir = i > pageIndex ? 'next' : 'prev';
+            slideToPage(i, dir);
           }
         };
         pageDots.appendChild(dot);
@@ -155,7 +168,9 @@ exports.init = function init(ctx) {
       const out = [];
       for (const w of (items || [])) {
         const span = Math.max(1, Math.min(totalCols, Number(w.span) || 1));
-        const rspan = Math.max(1, Math.min(totalRows, Number(w.rspan) || totalRows));
+        // Default rspan: when split view is ON, default to full height; when split is OFF, default to 1 row
+        const defaultRspan = page.split ? totalRows : 1;
+        const rspan = Math.max(1, Math.min(totalRows, Number(w.rspan) || defaultRspan));
         const wantCol = Number.isFinite(w.col) ? Math.max(0, Math.min(totalCols - span, Number(w.col))) : -1;
         const wantRow = Number.isFinite(w.row) ? Math.max(0, Math.min(totalRows - rspan, Number(w.row))) : -1;
         const fits = (c, r) => (
@@ -516,11 +531,45 @@ exports.init = function init(ctx) {
       const grid = document.getElementById('dashGrid');
       if (!grid) { pageIndex = newIndex; dash.pageIndex = pageIndex; saveConfig(); render(); showPageIndicator(); return; }
 
+      // Measure current visible card heights before hiding
+      const fromCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => el.offsetHeight || el.clientHeight || 0);
+
+      // Helper to freeze a grid's column sizes into fixed pixels on a clone
+      function freezeGridColumns(srcGridEl, cloneGridEl) {
+        try {
+          const cs = getComputedStyle(srcGridEl);
+          const gap = parseFloat(cs.gap || cs.columnGap || '0') || 0;
+          const clientW = srcGridEl.clientWidth || srcGridEl.getBoundingClientRect().width || 0;
+          // Determine column count from inline style (e.g., "repeat(3, 1fr)")
+          let colCount = 0;
+          try {
+            const gtc = (srcGridEl.style && (srcGridEl.style.gridTemplateColumns || '')) || '';
+            const m = /repeat\((\d+)\s*,\s*1fr\s*\)/i.exec(gtc);
+            if (m) colCount = Math.max(1, parseInt(m[1], 10) || 0);
+          } catch {}
+          // Fallback: infer from number of items in first row if needed
+          if (!colCount) {
+            try { colCount = Math.max(1, (srcGridEl.firstElementChild ? Math.min(6, srcGridEl.children.length) : 3)); } catch { colCount = 3; }
+          }
+          const totalGaps = Math.max(0, colCount - 1) * gap;
+          const colW = colCount > 0 ? Math.max(0, (clientW - totalGaps) / colCount) : clientW;
+          const template = Array.from({ length: colCount }, () => `${Math.round(colW)}px`).join(' ');
+          cloneGridEl.style.gridTemplateColumns = template;
+          // Also freeze the gap to the computed value to avoid rounding differences
+          if (gap) cloneGridEl.style.gap = `${gap}px`;
+        } catch {}
+      }
+
       // Snapshot current page
       const fromClone = grid.cloneNode(true);
       try { fromClone.id = ''; } catch {}
+      try { fromClone.classList.add('dashGrid'); } catch {}
       fromClone.style.width = '100%';
       fromClone.style.height = '100%';
+      // Ensure the clone is visible even if the original gets hidden
+      fromClone.style.visibility = 'visible';
+      // Freeze column sizes so spans look identical during animation
+      freezeGridColumns(grid, fromClone);
       // Measure and hide real grid to avoid double-vision during animation
       const rect = grid.getBoundingClientRect();
       const prevVisibility = grid.style.visibility;
@@ -534,11 +583,19 @@ exports.init = function init(ctx) {
       saveConfig();
       render();
 
+      // Measure target page card heights from the (hidden) real grid
+      const toCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => el.offsetHeight || el.clientHeight || 0);
+
       // Snapshot target page
       const toClone = grid.cloneNode(true);
       try { toClone.id = ''; } catch {}
+      try { toClone.classList.add('dashGrid'); } catch {}
       toClone.style.width = '100%';
       toClone.style.height = '100%';
+      // Make sure the target clone is visible (original grid is hidden)
+      toClone.style.visibility = 'visible';
+      // Freeze column sizes for the destination as well
+      freezeGridColumns(grid, toClone);
 
       // Build overlay that slides
       const overlay = document.createElement('div');
@@ -555,39 +612,58 @@ exports.init = function init(ctx) {
       track.style.display = 'flex';
       track.style.width = '200%';
       track.style.height = '100%';
-      track.style.transform = 'translateX(0)';
       const ui = (config && config.ui) || {};
       const slideMs = Math.max(200, Math.min(2000, Number(ui.pageSlideMs) || 500));
       const slideEasing = (typeof ui.pageSlideEasing === 'string' && ui.pageSlideEasing.trim()) || 'cubic-bezier(0.22, 0.61, 0.36, 1)';
-      track.style.transition = `transform ${slideMs}ms ${slideEasing}`;
+      // Be explicit with transition pieces for robustness
+      track.style.transitionProperty = 'transform';
+      track.style.transitionDuration = `${slideMs}ms`;
+      track.style.transitionTimingFunction = slideEasing;
       track.style.willChange = 'transform';
 
       const a = document.createElement('div'); a.style.flex = '0 0 100%'; a.style.height = '100%'; a.appendChild(fromClone);
       const b = document.createElement('div'); b.style.flex = '0 0 100%'; b.style.height = '100%'; b.appendChild(toClone);
 
+      // Freeze card heights inside clones to avoid size jumps during animation
+      try {
+        const aCards = Array.from(fromClone.querySelectorAll('.card'));
+        aCards.forEach((el, i) => { const h = fromCardHeights[i] || el.offsetHeight || 0; if (h) { el.style.height = h + 'px'; } });
+      } catch {}
+      try {
+        const bCards = Array.from(toClone.querySelectorAll('.card'));
+        bCards.forEach((el, i) => { const h = toCardHeights[i] || el.offsetHeight || 0; if (h) { el.style.height = h + 'px'; } });
+      } catch {}
+
       // Order based on direction
       if (direction === 'next') {
         // from | to, slide left
         track.appendChild(a); track.appendChild(b);
-        track.style.transform = 'translateX(0)';
       } else {
         // to | from, start at -100%, slide right to 0
         track.appendChild(b); track.appendChild(a);
-        track.style.transform = 'translateX(-100%)';
       }
 
       overlay.appendChild(track);
       // Place overlay atop everything
       document.body.appendChild(overlay);
 
-      // Kick off animation on next frame
+      // Kick off animation on next frame (ensure layout is committed)
       isAnimating = true;
       requestAnimationFrame(() => {
+        // Set initial transform after insertion to ensure it sticks
+        if (direction === 'next') {
+          track.style.transform = 'translate3d(0, 0, 0)';
+        } else {
+          track.style.transform = 'translate3d(-100%, 0, 0)';
+        }
+        // Force a reflow to ensure the initial transform is committed
+        try { void track.offsetWidth; } catch {}
         requestAnimationFrame(() => {
+          // Now animate to the target position
           if (direction === 'next') {
-            track.style.transform = 'translateX(-100%)';
+            track.style.transform = 'translate3d(-100%, 0, 0)';
           } else {
-            track.style.transform = 'translateX(0)';
+            track.style.transform = 'translate3d(0, 0, 0)';
           }
         });
       });

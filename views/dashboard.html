@@ -1,17 +1,17 @@
 ﻿<style>
   .dashboard-wrap { display:flex; flex-direction:column; height:100%; min-height:0; }
-  #dashGrid { flex:1; min-height: 0; grid-template-rows: 1fr; position: relative; }
-  #dashGrid .card { height: 90%; }
+  #dashGrid, .dashGrid { flex:1; min-height: 0; grid-template-rows: 1fr; position: relative; }
+  #dashGrid .card, .dashGrid .card { height: 90%; }
   /* Ensure some extra space at the bottom of widgets to visually match top padding */
-  #dashGrid .card { padding-bottom: 0px; }
+  #dashGrid .card, .dashGrid .card { padding-bottom: 0px; }
   #dashHeader { position: relative; z-index: 10000; }
   /* Show slot boxes during edit mode */
-  #dashGrid .slot-outline {
+  #dashGrid .slot-outline, .dashGrid .slot-outline {
     border: 2px dashed rgba(255,255,255,0.18);
     border-radius: 5px;
     height: 100%;
   }
-  #dashGrid .slot-outline.slot-empty {
+  #dashGrid .slot-outline.slot-empty, .dashGrid .slot-outline.slot-empty {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -22,8 +22,8 @@
   }
  
   /* Dragging visual indicator */
-  #dashGrid.is-dragging { position: relative; }
-  #dashGrid.is-dragging::after {
+  #dashGrid.is-dragging, .dashGrid.is-dragging { position: relative; }
+  #dashGrid.is-dragging::after, .dashGrid.is-dragging::after {
     content: 'Moving widget';
     position: absolute;
     top: 8px;
@@ -37,8 +37,8 @@
     pointer-events: none;
     z-index: 50;
   }
-  #dashGrid.is-dragging .card { opacity: 0.65; transition: opacity 80ms ease, transform 80ms ease; }
-  #dashGrid.is-dragging .card.dragging { opacity: 0.35; transform: scale(0.98); }
+  #dashGrid.is-dragging .card, .dashGrid.is-dragging .card { opacity: 0.65; transition: opacity 80ms ease, transform 80ms ease; }
+  #dashGrid.is-dragging .card.dragging, .dashGrid.is-dragging .card.dragging { opacity: 0.35; transform: scale(0.98); }
   /* Larger edit controls */
   .edit-ctrls { user-select: none; }
   .edit-btn {
@@ -55,7 +55,7 @@
   .edit-btn:active { transform: translateY(1px); }
  
   /* Make cards a flex column and allow children to shrink */
-#dashGrid .card {
+#dashGrid .card, .dashGrid .card {
   display: flex;
   flex-direction: column;
   min-height: 0;        /* IMPORTANT for nested flex/grids */
@@ -63,7 +63,7 @@
 }
 
 /* The immediate body that widgets render into should flex */
-#dashGrid .card > div {
+#dashGrid .card > div, .dashGrid .card > div {
   flex: 1 1 auto;
   min-height: 0;        /* prevents half-render when content is larger */
 }

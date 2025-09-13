@@ -173,7 +173,7 @@
           "split": true
         }
       ],
-      "pageIndex": 1,
+      "pageIndex": 0,
       "navEnabled": false
     }
   },
@@ -181,7 +181,7 @@
     "mode": "windows"
   },
   "ui": {
-    "widgetGlassOpacity": 62,
+    "widgetGlassOpacity": 100,
     "widgetBackgroundVisible": true,
     "pageSlideMs": 600,
     "pageSlideEasing": "ease-out"

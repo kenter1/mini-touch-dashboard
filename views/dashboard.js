@@ -524,12 +524,24 @@ exports.init = function init(ctx) {
   let isSwiping = false;
   let pageIndicatorTimer = null;
   let isAnimating = false;
+  // Guard multiple fast swipes: tie cleanup to the latest animation only
+  let animSeq = 0;
+  let animCleanup = null;
+  let animTimer = null;
 
   function slideToPage(newIndex, direction /* 'next' | 'prev' */) {
     try {
+      // If an animation is in progress, ignore to avoid overlapping state
       if (isAnimating) return;
+      // Bump sequence and clear any previous safety timers/overlays
+      const mySeq = ++animSeq;
+      try { if (animTimer) { clearTimeout(animTimer); animTimer = null; } } catch {}
+      try { if (typeof animCleanup === 'function') { animCleanup(); } } catch {}
+      animCleanup = null;
       const grid = document.getElementById('dashGrid');
       if (!grid) { pageIndex = newIndex; dash.pageIndex = pageIndex; saveConfig(); render(); showPageIndicator(); return; }
+      // Mark animating early to block re-entrancy from rapid swipes
+      isAnimating = true;
 
       // Measure current visible card border-box heights before hiding
       const fromCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => {
@@ -613,7 +625,10 @@ exports.init = function init(ctx) {
       overlay.style.height = Math.round(rect.height) + 'px';
       overlay.style.overflow = 'hidden';
       overlay.style.zIndex = '9999';
-      overlay.style.pointerEvents = 'none';
+      // Intercept input during the slide to avoid re-entrancy and clicks
+      overlay.style.pointerEvents = 'auto';
+      overlay.style.touchAction = 'none';
+      try { overlay.dataset.seq = String(mySeq); } catch {}
 
       const track = document.createElement('div');
       track.style.display = 'flex';
@@ -661,7 +676,6 @@ exports.init = function init(ctx) {
       document.body.appendChild(overlay);
 
       // Kick off animation on next frame (ensure layout is committed)
-      isAnimating = true;
       requestAnimationFrame(() => {
         // Set initial transform after insertion to ensure it sticks
         if (direction === 'next') {
@@ -682,17 +696,37 @@ exports.init = function init(ctx) {
       });
 
       const done = () => {
+        // Always remove this overlay
         try { overlay.remove(); } catch {}
+        // Only the latest animation may restore grid visibility/pointer events
+        if (mySeq !== animSeq) return;
         grid.style.visibility = prevVisibility;
         grid.style.pointerEvents = prevPointer;
         isAnimating = false;
+        animCleanup = null;
         try { showPageIndicator(); } catch {}
       };
-      track.addEventListener('transitionend', done, { once: true });
-      // Safety timeout in case transitionend doesn't fire
-      setTimeout(done, slideMs + 240);
+      // Only finish when the track's own transform transition ends.
+      const onTrackTransitionEnd = (e) => {
+        try {
+          if (e && e.target === track && String(e.propertyName) === 'transform') {
+            done();
+            track.removeEventListener('transitionend', onTrackTransitionEnd, true);
+          }
+        } catch {
+          // Fallback to done if anything unexpected happens
+          try { done(); } catch {}
+          track.removeEventListener('transitionend', onTrackTransitionEnd, true);
+        }
+      };
+      track.addEventListener('transitionend', onTrackTransitionEnd, true);
+      // Safety timeout in case transitionend doesn't fire (sequence-aware)
+      animTimer = setTimeout(() => { done(); }, slideMs + 240);
+      // Allow a newer animation to clean this overlay up preemptively
+      animCleanup = () => { try { overlay.remove(); } catch {} };
     } catch (e) {
       // Fallback without animation
+      isAnimating = false;
       pageIndex = newIndex; dash.pageIndex = pageIndex; saveConfig(); render(); showPageIndicator();
     }
   }

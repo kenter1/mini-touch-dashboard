@@ -59,7 +59,8 @@ function createWindow() {
       nodeIntegration: true,      // Keep simple for a local dashboard
       contextIsolation: false,    // (For production harden with a preload bridge)
       backgroundThrottling: false,
-      webviewTag: true            // Enable <webview> for in-app browser views
+      webviewTag: true,           // Enable <webview> for in-app browser views
+      webSecurity: false          // Disable web security for iframe widgets (only for local dashboard)
     }
   });
     //Temp

@@ -1,6 +1,6 @@
 // Dashboard: configurable widget grid with pages/slots
 exports.init = function init(ctx) {
-  const { config } = ctx;
+  const { config, appItem } = ctx;
   const path = require('path');
   const fs = require('fs');
   const { parseStringPromise } = require('xml2js');
@@ -12,16 +12,30 @@ exports.init = function init(ctx) {
   const addTimer = (id) => { if (id) timers.push(id); };
   function clearTimers() { try { timers.forEach(clearInterval); } catch {} timers = []; }
   let editMode = false;
-  const dash = (config.dashboard = config.dashboard || {});
+ 
+  // Use app-specific dashboard config (fallback to 'default')
+  const appId = appItem ? appItem.id : 'default';
+  const dashboards = (config.dashboards = config.dashboards || {});
+  const dash = (dashboards[appId] = dashboards[appId] || {});
   // Default: navigation/header enabled unless explicitly disabled
   if (typeof dash.navEnabled === 'undefined') dash.navEnabled = true;
+ 
   dash.pages = Array.isArray(dash.pages) && dash.pages.length ? dash.pages : [
     { columns: 3, widgets: [ { type:'clock', span: 1 }, { type:'weather', span: 1 }, { type:'system', span: 1 } ] }
   ];
   let pageIndex = Math.max(0, Math.min((dash.pageIndex|0)||0, dash.pages.length-1));
 
   function saveConfig() {
-    try { fs.writeFileSync(path.join(__dirname, '..', 'config.json'), JSON.stringify(config, null, 2)); } catch {}
+    try { 
+      // Make sure we're saving to the correct app-specific config
+      const appId = appItem ? appItem.id : 'default';
+      const dashboards = (config.dashboards = config.dashboards || {});
+      const dash = dashboards[appId];
+      if (dash) {
+        dash.pageIndex = pageIndex;
+      }
+      fs.writeFileSync(path.join(__dirname, '..', 'config.json'), JSON.stringify(config, null, 2)); 
+    } catch {}
   }
 
   // Helpers
@@ -76,7 +90,9 @@ exports.init = function init(ctx) {
             const id = String(def.id || file.replace(/\.js$/i, ''));
             if (!id || loaded.has(id)) continue;
             if (typeof def.render !== 'function') continue;
-            widgets[id] = { title: def.title || id, render: def.render };
+            // Special handling for iframe widget to show it can handle HTML content
+            const title = (id === 'iframe') ? 'IFrame/HTML' : (def.title || id);
+            widgets[id] = { title, render: def.render };
             loaded.add(id);
           } catch {}
         }
@@ -99,9 +115,37 @@ exports.init = function init(ctx) {
     // Header controls
     const header = document.getElementById('dashHeader'); if (header) header.style.display = (dash.navEnabled === false) ? 'none' : '';
     const pageLabel = document.getElementById('dashPageLabel'); if (pageLabel) pageLabel.textContent = `Page ${pageIndex+1} / ${dash.pages.length}`;
+    // Add page dots navigation
+    const pageDots = document.getElementById('dashPageDots'); 
+    if (pageDots) {
+      pageDots.innerHTML = '';
+      for (let i = 0; i < dash.pages.length; i++) {
+        const dot = document.createElement('div');
+        dot.style.width = '8px';
+        dot.style.height = '8px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = i === pageIndex ? 'var(--accent)' : 'rgba(255,255,255,0.3)';
+        dot.style.cursor = 'pointer';
+        dot.title = `Go to page ${i+1}`;
+        dot.onclick = (e) => {
+          e.stopPropagation();
+          if (i !== pageIndex) {
+            pageIndex = i;
+            dash.pageIndex = pageIndex;
+            saveConfig();
+            render();
+          }
+        };
+        pageDots.appendChild(dot);
+      }
+    }
     const colsLabel = document.getElementById('dashColsLabel'); if (colsLabel) colsLabel.textContent = `${cols} cols`;
     const editBtn = document.getElementById('dashToggleEdit'); if (editBtn) editBtn.textContent = `Edit: ${editMode ? 'On' : 'Off'}`;
     const splitBtn = document.getElementById('dashToggleSplit'); if (splitBtn) splitBtn.textContent = `Split: ${page.split ? 'On' : 'Off'}`;
+    // Page navigation controls
+    const pagePrevBtn = document.getElementById('dashPagePrev'); if (pagePrevBtn) pagePrevBtn.disabled = pageIndex <= 0;
+    const pageNextBtn = document.getElementById('dashPageNext'); if (pageNextBtn) pageNextBtn.disabled = pageIndex >= dash.pages.length - 1;
+    const pageRemoveBtn = document.getElementById('dashPageRemove'); if (pageRemoveBtn) pageRemoveBtn.disabled = dash.pages.length <= 1;
     // Ensure header controls are always interactive
     wireHeaderControls();
 
@@ -197,6 +241,10 @@ exports.init = function init(ctx) {
       card.className = 'card';
       card.style.gridColumn = `${startC + 1} / span ${span}`;
       card.style.gridRow = `${startR + 1} / span ${rspan || rows}`;
+      // Ensure proper height handling for iframe widgets
+      if (w.type === 'iframe') {
+        card.style.height = '100%';
+      }
       // Respect global UI preference for widget background visibility
       try {
         const bgVisible = !(((config.ui || {}).widgetBackgroundVisible) === false);
@@ -396,13 +444,22 @@ exports.init = function init(ctx) {
         const dec = mkBtn('-', 'Narrower');
         const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span; spanPill.style.fontSize='14px'; spanPill.style.padding='6px 10px';
         const inc = mkBtn('+', 'Wider');
-        const half = mkBtn('Half', 'Half height');
+ 
+        const halfBtn = mkBtn('Half', 'Half height');
         const full = mkBtn('Full', 'Full height');
         const del = mkBtn('Delete', 'Remove');
         const hideBtn = mkBtn(isHidden ? 'Show' : 'Hide', isHidden ? 'Show widget' : 'Hide widget');
         dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Number(w.span||1) - 1); saveConfig(); render(); };
         inc.onclick = (e) => { e.stopPropagation(); w.span = Math.min(cols, Number(w.span||1) + 1); saveConfig(); render(); };
-        half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min((w.row|0), rows-1)); saveConfig(); render(); } };
+        halfBtn.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min((w.row|0), rows-1)); saveConfig(); render(); } };
+ 
+        const half = mkBtn('½', 'Half height');
+        
+        
+        dec.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Math.min(cols, Number(w.span||1) - 1)); saveConfig(); render(); };
+        inc.onclick = (e) => { e.stopPropagation(); w.span = Math.max(1, Math.min(cols, Number(w.span||1) + 1)); saveConfig(); render(); };
+        half.onclick = (e) => { e.stopPropagation(); if (rows > 1) { w.rspan = 1; w.row = Math.max(0, Math.min(Number(w.row||0), rows-1)); saveConfig(); render(); } };
+ 
         full.onclick = (e) => { e.stopPropagation(); w.rspan = rows; w.row = 0; saveConfig(); render(); };
         del.onclick = (e) => { e.stopPropagation(); const arr = page.widgets || []; const i0 = arr.indexOf(w); if (i0 >= 0) arr.splice(i0,1); saveConfig(); render(); };
         hideBtn.onclick = (e) => { e.stopPropagation(); w.invisible = !isHidden; saveConfig(); render(); };
@@ -416,7 +473,7 @@ exports.init = function init(ctx) {
         sizeRow.appendChild(inc);
         ctrls.appendChild(sizeRow);
         // Stack action buttons vertically beneath
-        if (rows > 1) { ctrls.appendChild(half); ctrls.appendChild(full); }
+        if (rows > 1) { ctrls.appendChild(halfBtn); ctrls.appendChild(full); }
         ctrls.appendChild(hideBtn);
         ctrls.appendChild(del);
         card.appendChild(ctrls);
@@ -424,8 +481,72 @@ exports.init = function init(ctx) {
       const body = document.createElement('div');
       card.appendChild(body);
       grid.appendChild(card);
-      if (def && typeof def.render === 'function') def.render(body, { config, addTimer }); else body.textContent = `Unknown widget: ${w.type}`;
+
+      if (def && typeof def.render === 'function') def.render(body, { config, addTimer, editMode, widget: w, saveConfig, render }); else body.textContent = `Unknown widget: ${w.type}`;
     });
+
+    // Add swipe navigation support
+    const gridContainer = document.querySelector('.dashboard-wrap');
+    if (gridContainer) {
+      // Remove existing event listeners to avoid duplicates
+      gridContainer.removeEventListener('touchstart', handleSwipeStart);
+      gridContainer.removeEventListener('touchmove', handleSwipeMove);
+      gridContainer.removeEventListener('touchend', handleSwipeEnd);
+      
+      // Add swipe event listeners
+      gridContainer.addEventListener('touchstart', handleSwipeStart, { passive: true });
+      gridContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
+      gridContainer.addEventListener('touchend', handleSwipeEnd, { passive: true });
+    }
+  }
+
+  // Swipe navigation for pages
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let isSwiping = false;
+  
+  function handleSwipeStart(e) {
+    if (e.touches.length > 1) return; // Ignore multi-touch
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isSwiping = true;
+  }
+  
+  function handleSwipeMove(e) {
+    if (!isSwiping || e.touches.length > 1) return;
+    
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    const diffX = touchX - touchStartX;
+    const diffY = touchY - touchStartY;
+    
+    // Check if it's a clear horizontal swipe
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      e.preventDefault(); // Prevent scrolling during swipe
+      
+      if (diffX > 0) {
+        // Swipe right - go to previous page
+        if (pageIndex > 0) {
+          pageIndex = Math.max(0, pageIndex - 1);
+          dash.pageIndex = pageIndex;
+          saveConfig();
+          render();
+        }
+      } else if (diffX < 0) {
+        // Swipe left - go to next page
+        if (pageIndex < dash.pages.length - 1) {
+          pageIndex = Math.min(dash.pages.length - 1, pageIndex + 1);
+          dash.pageIndex = pageIndex;
+          saveConfig();
+          render();
+        }
+      }
+      isSwiping = false;
+    }
+  }
+  
+  function handleSwipeEnd() {
+    isSwiping = false;
   }
 
   // Wire controls (ensure bindings persist and can't be blocked by overlays)
@@ -437,6 +558,36 @@ exports.init = function init(ctx) {
       el.addEventListener('click', (e) => { e.stopPropagation(); handler(e); }, true); // capture
       el.dataset.bound = '1';
     }
+    bind(document.getElementById('dashPagePrev'), () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } });
+    bind(document.getElementById('dashPageNext'), () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } });
+    bind(document.getElementById('dashPageAdd'), () => { 
+      // Add a new page with default configuration
+      const newPage = {
+        columns: 3,
+        widgets: []
+      };
+      dash.pages.push(newPage);
+      pageIndex = dash.pages.length - 1;
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    });
+    bind(document.getElementById('dashPageRemove'), () => {
+      // Don't remove the last page
+      if (dash.pages.length <= 1) return;
+      
+      // Remove current page
+      dash.pages.splice(pageIndex, 1);
+      
+      // Adjust pageIndex if needed
+      if (pageIndex >= dash.pages.length) {
+        pageIndex = dash.pages.length - 1;
+      }
+      
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    });
     bind(document.getElementById('dashColsDec'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) - 1)); saveConfig(); render(); });
     bind(document.getElementById('dashColsInc'), () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); });
     bind(document.getElementById('dashToggleEdit'), () => { if (dash.navEnabled === false) { editMode = false; } else { editMode = !editMode; } render(); });
@@ -456,6 +607,33 @@ exports.init = function init(ctx) {
           const inc = el.closest && el.closest('#dashColsInc');
           const tog = el.closest && el.closest('#dashToggleEdit');
           const split = el.closest && el.closest('#dashToggleSplit');
+          const pagePrev = el.closest && el.closest('#dashPagePrev');
+          const pageNext = el.closest && el.closest('#dashPageNext');
+          const pageAdd = el.closest && el.closest('#dashPageAdd');
+          const pageRemove = el.closest && el.closest('#dashPageRemove');
+          
+          // Handle page navigation buttons with higher priority
+          if (pagePrev) {
+            e.stopPropagation();
+            if (pageIndex > 0) {
+              pageIndex--;
+              dash.pageIndex = pageIndex;
+              saveConfig();
+              render();
+            }
+            return;
+          }
+          if (pageNext) {
+            e.stopPropagation();
+            if (pageIndex < dash.pages.length - 1) {
+              pageIndex++;
+              dash.pageIndex = pageIndex;
+              saveConfig();
+              render();
+            }
+            return;
+          }
+          
           if (dec) {
             e.stopPropagation();
             const p = dash.pages[pageIndex];
@@ -482,6 +660,38 @@ exports.init = function init(ctx) {
             e.stopPropagation();
             const p = dash.pages[pageIndex];
             p.split = !p.split;
+            saveConfig();
+            render();
+            return;
+          }
+          if (pageAdd) {
+            e.stopPropagation();
+            // Add a new page with default configuration
+            const newPage = {
+              columns: 3,
+              widgets: []
+            };
+            dash.pages.push(newPage);
+            pageIndex = dash.pages.length - 1;
+            dash.pageIndex = pageIndex;
+            saveConfig();
+            render();
+            return;
+          }
+          if (pageRemove) {
+            e.stopPropagation();
+            // Don't remove the last page
+            if (dash.pages.length <= 1) return;
+            
+            // Remove current page
+            dash.pages.splice(pageIndex, 1);
+            
+            // Adjust pageIndex if needed
+            if (pageIndex >= dash.pages.length) {
+              pageIndex = dash.pages.length - 1;
+            }
+            
+            dash.pageIndex = pageIndex;
             saveConfig();
             render();
             return;
@@ -559,6 +769,38 @@ exports.init = function init(ctx) {
     window.dashColsInc = () => { const p = dash.pages[pageIndex]; p.columns = Math.max(1, Math.min(6, (p.columns|0) + 1)); saveConfig(); render(); };
     window.dashToggleEdit = () => { if (dash.navEnabled === false) { editMode = false; } else { editMode = !editMode; } render(); };
     window.dashToggleSplit = () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); };
+    // Add page navigation functions
+    window.dashPagePrev = () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } };
+    window.dashPageNext = () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } };
+    // Add page management functions
+    window.dashPageAdd = () => {
+      // Add a new page with default configuration
+      const newPage = {
+        columns: 3,
+        widgets: []
+      };
+      dash.pages.push(newPage);
+      pageIndex = dash.pages.length - 1;
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    };
+    window.dashPageRemove = () => {
+      // Don't remove the last page
+      if (dash.pages.length <= 1) return;
+      
+      // Remove current page
+      dash.pages.splice(pageIndex, 1);
+      
+      // Adjust pageIndex if needed
+      if (pageIndex >= dash.pages.length) {
+        pageIndex = dash.pages.length - 1;
+      }
+      
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+    };
   } catch {}
   exports.onConfigUpdated = onConfigUpdated;
   exports.destroy = function destroy() {

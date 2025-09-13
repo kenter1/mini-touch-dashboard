@@ -20,6 +20,7 @@
     color: rgba(255,255,255,0.35);
     background: rgba(255,255,255,0.03);
   }
+ 
   /* Dragging visual indicator */
   #dashGrid.is-dragging { position: relative; }
   #dashGrid.is-dragging::after {
@@ -52,12 +53,35 @@
     cursor: pointer;
   }
   .edit-btn:active { transform: translateY(1px); }
+ 
+  /* Make cards a flex column and allow children to shrink */
+#dashGrid .card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;        /* IMPORTANT for nested flex/grids */
+  overflow: hidden;     /* optional, keeps rounded corners tidy */
+}
+
+/* The immediate body that widgets render into should flex */
+#dashGrid .card > div {
+  flex: 1 1 auto;
+  min-height: 0;        /* prevents half-render when content is larger */
+}
+
+ 
 </style>
 <div class="dashboard-wrap">
   <div class="card" id="dashHeader" style="margin-bottom: 8px;">
     <div class="row" style="align-items:center; justify-content:space-between;">
       <div class="title">Dashboard</div>
       <div class="row" id="dashControls" style="gap:8px;">
+        <div style="width:12px;"></div>
+        <button class="small-btn" id="dashPagePrev" onclick="window.dashPagePrev && window.dashPagePrev()" title="Previous Page">&larr;</button>
+        <div class="pill" id="dashPageLabel">Page 1 / 1</div>
+        <button class="small-btn" id="dashPageNext" onclick="window.dashPageNext && window.dashPageNext()" title="Next Page">&rarr;</button>
+        <div id="dashPageDots" style="display:flex;gap:4px;align-items:center;"></div>
+        <button class="small-btn" id="dashPageAdd" onclick="window.dashPageAdd && window.dashPageAdd()" title="Add Page">+</button>
+        <button class="small-btn" id="dashPageRemove" onclick="window.dashPageRemove && window.dashPageRemove()" title="Remove Current Page">-</button>
         <div style="width:12px;"></div>
         <button class="small-btn" id="dashColsDec" onclick="window.dashColsDec && window.dashColsDec()">- Col</button>
         <div class="pill" id="dashColsLabel">3 cols</div>

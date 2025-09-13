@@ -507,6 +507,148 @@ exports.init = function init(ctx) {
   let touchStartX = 0;
   let touchStartY = 0;
   let isSwiping = false;
+  let pageIndicatorTimer = null;
+  let isAnimating = false;
+
+  function slideToPage(newIndex, direction /* 'next' | 'prev' */) {
+    try {
+      if (isAnimating) return;
+      const grid = document.getElementById('dashGrid');
+      if (!grid) { pageIndex = newIndex; dash.pageIndex = pageIndex; saveConfig(); render(); showPageIndicator(); return; }
+
+      // Snapshot current page
+      const fromClone = grid.cloneNode(true);
+      try { fromClone.id = ''; } catch {}
+      fromClone.style.width = '100%';
+      fromClone.style.height = '100%';
+      // Measure and hide real grid to avoid double-vision during animation
+      const rect = grid.getBoundingClientRect();
+      const prevVisibility = grid.style.visibility;
+      const prevPointer = grid.style.pointerEvents;
+      grid.style.visibility = 'hidden';
+      grid.style.pointerEvents = 'none';
+
+      // Render target page into real grid while hidden
+      pageIndex = newIndex;
+      dash.pageIndex = pageIndex;
+      saveConfig();
+      render();
+
+      // Snapshot target page
+      const toClone = grid.cloneNode(true);
+      try { toClone.id = ''; } catch {}
+      toClone.style.width = '100%';
+      toClone.style.height = '100%';
+
+      // Build overlay that slides
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.left = Math.round(rect.left) + 'px';
+      overlay.style.top = Math.round(rect.top) + 'px';
+      overlay.style.width = Math.round(rect.width) + 'px';
+      overlay.style.height = Math.round(rect.height) + 'px';
+      overlay.style.overflow = 'hidden';
+      overlay.style.zIndex = '9999';
+      overlay.style.pointerEvents = 'none';
+
+      const track = document.createElement('div');
+      track.style.display = 'flex';
+      track.style.width = '200%';
+      track.style.height = '100%';
+      track.style.transform = 'translateX(0)';
+      const ui = (config && config.ui) || {};
+      const slideMs = Math.max(200, Math.min(2000, Number(ui.pageSlideMs) || 500));
+      const slideEasing = (typeof ui.pageSlideEasing === 'string' && ui.pageSlideEasing.trim()) || 'cubic-bezier(0.22, 0.61, 0.36, 1)';
+      track.style.transition = `transform ${slideMs}ms ${slideEasing}`;
+      track.style.willChange = 'transform';
+
+      const a = document.createElement('div'); a.style.flex = '0 0 100%'; a.style.height = '100%'; a.appendChild(fromClone);
+      const b = document.createElement('div'); b.style.flex = '0 0 100%'; b.style.height = '100%'; b.appendChild(toClone);
+
+      // Order based on direction
+      if (direction === 'next') {
+        // from | to, slide left
+        track.appendChild(a); track.appendChild(b);
+        track.style.transform = 'translateX(0)';
+      } else {
+        // to | from, start at -100%, slide right to 0
+        track.appendChild(b); track.appendChild(a);
+        track.style.transform = 'translateX(-100%)';
+      }
+
+      overlay.appendChild(track);
+      // Place overlay atop everything
+      document.body.appendChild(overlay);
+
+      // Kick off animation on next frame
+      isAnimating = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (direction === 'next') {
+            track.style.transform = 'translateX(-100%)';
+          } else {
+            track.style.transform = 'translateX(0)';
+          }
+        });
+      });
+
+      const done = () => {
+        try { overlay.remove(); } catch {}
+        grid.style.visibility = prevVisibility;
+        grid.style.pointerEvents = prevPointer;
+        isAnimating = false;
+        try { showPageIndicator(); } catch {}
+      };
+      track.addEventListener('transitionend', done, { once: true });
+      // Safety timeout in case transitionend doesn't fire
+      setTimeout(done, slideMs + 240);
+    } catch (e) {
+      // Fallback without animation
+      pageIndex = newIndex; dash.pageIndex = pageIndex; saveConfig(); render(); showPageIndicator();
+    }
+  }
+
+  function showPageIndicator() {
+    try {
+      const ui = (config && config.ui) || {};
+      const duration = Math.max(300, Math.min(5000, Number(ui.pageIndicatorMs) || 1200));
+      const wrap = document.querySelector('.dashboard-wrap') || document.body;
+      // Remove any existing indicator
+      try { document.getElementById('dashPageToast')?.remove(); } catch {}
+      const el = document.createElement('div');
+      el.id = 'dashPageToast';
+      el.textContent = `Page ${pageIndex + 1} / ${dash.pages.length}`;
+      el.style.position = 'fixed';
+      el.style.left = '50%';
+      el.style.bottom = '24px';
+      el.style.transform = 'translateX(-50%)';
+      el.style.padding = '6px 10px';
+      el.style.borderRadius = '10px';
+      el.style.background = 'rgba(0,0,0,0.45)';
+      el.style.backdropFilter = 'blur(6px)';
+      el.style.color = 'var(--fg)';
+      el.style.fontSize = '12px';
+      el.style.lineHeight = '1';
+      el.style.border = '1px solid rgba(255,255,255,0.18)';
+      el.style.boxShadow = '0 6px 18px rgba(0,0,0,0.25)';
+      el.style.pointerEvents = 'none';
+      el.style.opacity = '0';
+      el.style.zIndex = '12000';
+      el.style.transition = 'opacity 200ms ease';
+      wrap.appendChild(el);
+      // Fade in next frame
+      requestAnimationFrame(() => { el.style.opacity = '1'; });
+      // Clear any previous timer
+      if (pageIndicatorTimer) { try { clearTimeout(pageIndicatorTimer); } catch {} }
+      // Auto-hide after a short delay
+      pageIndicatorTimer = setTimeout(() => {
+        try {
+          el.style.opacity = '0';
+          setTimeout(() => { try { el.remove(); } catch {} }, 250);
+        } catch {}
+      }, duration);
+    } catch {}
+  }
   
   function handleSwipeStart(e) {
     if (editMode) return; // Disabled while editing
@@ -532,18 +674,14 @@ exports.init = function init(ctx) {
       if (diffX > 0) {
         // Swipe right - go to previous page
         if (pageIndex > 0) {
-          pageIndex = Math.max(0, pageIndex - 1);
-          dash.pageIndex = pageIndex;
-          saveConfig();
-          render();
+          const target = Math.max(0, pageIndex - 1);
+          slideToPage(target, 'prev');
         }
       } else if (diffX < 0) {
         // Swipe left - go to next page
         if (pageIndex < dash.pages.length - 1) {
-          pageIndex = Math.min(dash.pages.length - 1, pageIndex + 1);
-          dash.pageIndex = pageIndex;
-          saveConfig();
-          render();
+          const target = Math.min(dash.pages.length - 1, pageIndex + 1);
+          slideToPage(target, 'next');
         }
       }
       isSwiping = false;
@@ -563,8 +701,8 @@ exports.init = function init(ctx) {
       el.addEventListener('click', (e) => { e.stopPropagation(); handler(e); }, true); // capture
       el.dataset.bound = '1';
     }
-    bind(document.getElementById('dashPagePrev'), () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } });
-    bind(document.getElementById('dashPageNext'), () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } });
+    bind(document.getElementById('dashPagePrev'), () => { if (pageIndex > 0) { slideToPage(pageIndex - 1, 'prev'); } });
+    bind(document.getElementById('dashPageNext'), () => { if (pageIndex < dash.pages.length - 1) { slideToPage(pageIndex + 1, 'next'); } });
     bind(document.getElementById('dashPageAdd'), () => { 
       // Add a new page with default configuration
       const newPage = {
@@ -621,20 +759,14 @@ exports.init = function init(ctx) {
           if (pagePrev) {
             e.stopPropagation();
             if (pageIndex > 0) {
-              pageIndex--;
-              dash.pageIndex = pageIndex;
-              saveConfig();
-              render();
+              slideToPage(pageIndex - 1, 'prev');
             }
             return;
           }
           if (pageNext) {
             e.stopPropagation();
             if (pageIndex < dash.pages.length - 1) {
-              pageIndex++;
-              dash.pageIndex = pageIndex;
-              saveConfig();
-              render();
+              slideToPage(pageIndex + 1, 'next');
             }
             return;
           }
@@ -775,8 +907,8 @@ exports.init = function init(ctx) {
     window.dashToggleEdit = () => { if (dash.navEnabled === false) { editMode = false; } else { editMode = !editMode; } render(); };
     window.dashToggleSplit = () => { const p = dash.pages[pageIndex]; p.split = !p.split; saveConfig(); render(); };
     // Add page navigation functions
-    window.dashPagePrev = () => { if (pageIndex > 0) { pageIndex--; dash.pageIndex = pageIndex; saveConfig(); render(); } };
-    window.dashPageNext = () => { if (pageIndex < dash.pages.length - 1) { pageIndex++; dash.pageIndex = pageIndex; saveConfig(); render(); } };
+    window.dashPagePrev = () => { if (pageIndex > 0) { slideToPage(pageIndex - 1, 'prev'); } };
+    window.dashPageNext = () => { if (pageIndex < dash.pages.length - 1) { slideToPage(pageIndex + 1, 'next'); } };
     // Add page management functions
     window.dashPageAdd = () => {
       // Add a new page with default configuration

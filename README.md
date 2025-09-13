@@ -31,7 +31,10 @@ Edit `config.json` to tailor the dashboard:
 - theme: `light`, `dark`, or `auto`.
 - ui.widgetGlassOpacity: 0–100. Controls widget card transparency (lower = more glass). Default 100 (opaque).
   - Settings shortcut: Settings → General → Appearance → "Widget Glass Opacity" or use the "Background: Visible/Hidden" toggle button.
- - ui.widgetBackgroundVisible: true/false. When false, dashboard widget cards remove their background and shadow entirely so no edges are visible. The widget content remains.
+- ui.widgetBackgroundVisible: true/false. When false, dashboard widget cards remove their background and shadow entirely so no edges are visible. The widget content remains.
+- ui.pageIndicatorMs: Optional number of milliseconds to show the page indicator when swiping pages (default 1200ms).
+ - ui.pageSlideMs: Optional slide animation duration in milliseconds when changing dashboard pages (default 500ms). Range 200–2000.
+ - ui.pageSlideEasing: Optional CSS timing function for page slide animation (default `cubic-bezier(0.22, 0.61, 0.36, 1)`). Examples: `ease`, `ease-out`, `linear`, or any cubic-bezier.
 
 Hide a widget
 - Enter Dashboard, toggle Edit: On (header).

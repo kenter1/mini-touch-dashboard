@@ -489,15 +489,17 @@ exports.init = function init(ctx) {
     // Add swipe navigation support
     const gridContainer = document.querySelector('.dashboard-wrap');
     if (gridContainer) {
-      // Remove existing event listeners to avoid duplicates
+      // Always remove existing listeners first to avoid duplicates
       gridContainer.removeEventListener('touchstart', handleSwipeStart);
       gridContainer.removeEventListener('touchmove', handleSwipeMove);
       gridContainer.removeEventListener('touchend', handleSwipeEnd);
-      
-      // Add swipe event listeners
-      gridContainer.addEventListener('touchstart', handleSwipeStart, { passive: true });
-      gridContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
-      gridContainer.addEventListener('touchend', handleSwipeEnd, { passive: true });
+
+      // Only enable swipe navigation when NOT in edit mode
+      if (!editMode) {
+        gridContainer.addEventListener('touchstart', handleSwipeStart, { passive: true });
+        gridContainer.addEventListener('touchmove', handleSwipeMove, { passive: false });
+        gridContainer.addEventListener('touchend', handleSwipeEnd, { passive: true });
+      }
     }
   }
 
@@ -507,6 +509,7 @@ exports.init = function init(ctx) {
   let isSwiping = false;
   
   function handleSwipeStart(e) {
+    if (editMode) return; // Disabled while editing
     if (e.touches.length > 1) return; // Ignore multi-touch
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
@@ -514,6 +517,7 @@ exports.init = function init(ctx) {
   }
   
   function handleSwipeMove(e) {
+    if (editMode) return; // Disabled while editing
     if (!isSwiping || e.touches.length > 1) return;
     
     const touchX = e.touches[0].clientX;

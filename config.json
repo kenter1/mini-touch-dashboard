@@ -87,7 +87,7 @@
       }
     ],
     "pageIndex": 0,
-    "navEnabled": true
+    "navEnabled": false
   },
   "dashboards": {
     "dashboard-0": {
@@ -134,11 +134,12 @@
               "rspan": 1
             },
             {
-              "type": "timer",
-              "span": 1,
+              "type": "launchpad",
+              "span": 2,
               "col": 0,
               "row": 0,
-              "rspan": 1
+              "rspan": 2,
+              "invisible": false
             }
           ],
           "split": true
@@ -189,7 +190,7 @@
           "split": true
         }
       ],
-      "pageIndex": 2,
+      "pageIndex": 0,
       "navEnabled": true
     }
   },

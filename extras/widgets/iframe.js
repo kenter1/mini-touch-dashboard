@@ -28,30 +28,39 @@ module.exports = {
     // Generate a unique ID for this webview
     const webViewId = 'webView-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
     
+    // Build inner layout. In edit mode, do NOT render the webview/iframe to avoid
+    // loading external content and interfering with drag/resize.
     container.innerHTML = `
   <div style="display:flex;flex-direction:column;width:100%;height:100%;min-height:0;">
     ${editMode ? `
-    <div style="display:flex;justify-content:center;margin:0px 0;flex:0 0 auto;">
-      <button class="small-btn" id="editIframeBtn-${webViewId}" style="padding:0px 0px;font-size:12px;z-index:100;position:relative;">✏️ Edit</button>
+    <div style=\"display:flex;justify-content:center;margin:0px 0;flex:0 0 auto;\">
+      <button class=\"small-btn\" id=\"editIframeBtn-${webViewId}\" style=\"padding:0px 0px;font-size:12px;z-index:100;position:relative;\">✏️ Edit</button>
     </div>
     ` : ''}
     <div style="flex:1 1 auto;min-height:0;position:relative;overflow:hidden;border-radius:8px;background:rgba(0,0,0,0.1);" class="card">
-      <webview id="${webViewId}" src="${webViewSrc}"
-        style="width:100%; height:100%; position:absolute; inset:0; z-index:1;"
-        allowpopups allowfullscreen>
-      </webview>
+      ${editMode ? `
+        <div style=\"position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:14px;\">
+          <span style=\"opacity:0.85;\">IFrame preview hidden in edit mode</span>
+          ${webViewSrc && webViewSrc !== 'about:blank' ? `<span class=\"pill\" style=\"opacity:.9;\">${webViewSrc}</span>` : ''}
+        </div>
+      ` : `
+        <webview id=\"${webViewId}\" src=\"${webViewSrc}\"
+          style=\"width:100%; height:100%; position:absolute; inset:0; z-index:1;\"
+          allowpopups allowfullscreen>
+        </webview>
+      `}
     </div>
     ${editMode ? `
-    <div id="iframeEditPanel-${webViewId}" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:90%;max-width:500px;max-height:80%;overflow:auto;padding:12px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.3);z-index:1000;">
-      <div style="margin-bottom:8px;font-weight:bold;">Edit WebView Settings</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
+    <div id=\"iframeEditPanel-${webViewId}\" style=\"display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:90%;max-width:500px;max-height:80%;overflow:auto;padding:12px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.3);z-index:1000;\">
+      <div style=\"margin-bottom:8px;font-weight:bold;\">Edit WebView Settings</div>
+      <div style=\"display:flex;flex-direction:column;gap:8px;\">
         <div>
-          <label style="display:block;margin-bottom:4px;font-size:12px;">URL:</label>
-          <input type="text" id="iframeSrc-${webViewId}" value="${webViewSrc}" placeholder="https://example.com" style="width:100%;padding:6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:var(--card);color:var(--fg);">
+          <label style=\"display:block;margin-bottom:4px;font-size:12px;\">URL:</label>
+          <input type=\"text\" id=\"iframeSrc-${webViewId}\" value=\"${webViewSrc}\" placeholder=\"https://example.com\" style=\"width:100%;padding:6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:var(--card);color:var(--fg);\">
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="small-btn" id="iframeSaveBtn-${webViewId}" style="flex:1;">💾 Save</button>
-          <button class="small-btn" id="iframeCancelBtn-${webViewId}" style="flex:1;">❌ Cancel</button>
+        <div style=\"display:flex;gap:8px;margin-top:8px;\">
+          <button class=\"small-btn\" id=\"iframeSaveBtn-${webViewId}\" style=\"flex:1;\">💾 Save</button>
+          <button class=\"small-btn\" id=\"iframeCancelBtn-${webViewId}\" style=\"flex:1;\">❌ Cancel</button>
         </div>
       </div>
     </div>
@@ -59,22 +68,21 @@ module.exports = {
   </div>
 `;
 
-    // Add event listeners after a short delay to ensure DOM is ready
-    setTimeout(() => {
-      const webview = document.getElementById(webViewId);
-      if (webview) {
-        console.log('WebView created with ID:', webViewId, 'and src:', webViewSrc);
-        
-        // Add event listeners
-        webview.addEventListener('did-finish-load', function() {
-          console.log('WebView finished loading:', webViewId);
-        });
-        
-        webview.addEventListener('did-fail-load', function(event) {
-          console.log('WebView failed to load:', webViewId, event.errorCode, event.errorDescription);
-        });
-      }
-    }, 100);
+    // Add webview event listeners only when not in edit mode
+    if (!editMode) {
+      setTimeout(() => {
+        const webview = document.getElementById(webViewId);
+        if (webview) {
+          try { console.log('WebView created with ID:', webViewId, 'and src:', webViewSrc); } catch {}
+          webview.addEventListener('did-finish-load', function() {
+            try { console.log('WebView finished loading:', webViewId); } catch {}
+          });
+          webview.addEventListener('did-fail-load', function(event) {
+            try { console.log('WebView failed to load:', webViewId, event.errorCode, event.errorDescription); } catch {}
+          });
+        }
+      }, 100);
+    }
     
     // Add event listeners if in edit mode
     if (editMode) {

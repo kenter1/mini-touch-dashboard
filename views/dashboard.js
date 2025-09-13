@@ -440,6 +440,7 @@ exports.init = function init(ctx) {
         ctrls.style.padding = '6px 8px';
         ctrls.style.borderRadius = '12px';
         ctrls.style.pointerEvents = 'auto';
+        ctrls.style.zIndex = '500';
         const mkBtn = (label, title) => { const b = document.createElement('button'); b.className='edit-btn'; b.textContent=label; b.title=title; b.style.lineHeight='1'; return b; };
         const dec = mkBtn('-', 'Narrower');
         const spanPill = document.createElement('div'); spanPill.className='pill'; spanPill.textContent = 'x'+span; spanPill.style.fontSize='14px'; spanPill.style.padding='6px 10px';

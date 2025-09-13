@@ -531,8 +531,10 @@ exports.init = function init(ctx) {
       const grid = document.getElementById('dashGrid');
       if (!grid) { pageIndex = newIndex; dash.pageIndex = pageIndex; saveConfig(); render(); showPageIndicator(); return; }
 
-      // Measure current visible card heights before hiding
-      const fromCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => el.offsetHeight || el.clientHeight || 0);
+      // Measure current visible card border-box heights before hiding
+      const fromCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => {
+        try { return el.getBoundingClientRect().height || 0; } catch { return el.offsetHeight || 0; }
+      });
 
       // Helper to freeze a grid's column sizes into fixed pixels on a clone
       function freezeGridColumns(srcGridEl, cloneGridEl) {
@@ -540,6 +542,9 @@ exports.init = function init(ctx) {
           const cs = getComputedStyle(srcGridEl);
           const gap = parseFloat(cs.gap || cs.columnGap || '0') || 0;
           const clientW = srcGridEl.clientWidth || srcGridEl.getBoundingClientRect().width || 0;
+          const padL = parseFloat(cs.paddingLeft || '0') || 0;
+          const padR = parseFloat(cs.paddingRight || '0') || 0;
+          const contentW = Math.max(0, clientW - padL - padR);
           // Determine column count from inline style (e.g., "repeat(3, 1fr)")
           let colCount = 0;
           try {
@@ -552,7 +557,7 @@ exports.init = function init(ctx) {
             try { colCount = Math.max(1, (srcGridEl.firstElementChild ? Math.min(6, srcGridEl.children.length) : 3)); } catch { colCount = 3; }
           }
           const totalGaps = Math.max(0, colCount - 1) * gap;
-          const colW = colCount > 0 ? Math.max(0, (clientW - totalGaps) / colCount) : clientW;
+          const colW = colCount > 0 ? Math.max(0, (contentW - totalGaps) / colCount) : contentW;
           const template = Array.from({ length: colCount }, () => `${Math.round(colW)}px`).join(' ');
           cloneGridEl.style.gridTemplateColumns = template;
           // Also freeze the gap to the computed value to avoid rounding differences
@@ -583,8 +588,10 @@ exports.init = function init(ctx) {
       saveConfig();
       render();
 
-      // Measure target page card heights from the (hidden) real grid
-      const toCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => el.offsetHeight || el.clientHeight || 0);
+      // Measure target page card border-box heights from the (hidden) real grid
+      const toCardHeights = Array.from(grid.querySelectorAll('.card')).map(el => {
+        try { return el.getBoundingClientRect().height || 0; } catch { return el.offsetHeight || 0; }
+      });
 
       // Snapshot target page
       const toClone = grid.cloneNode(true);
@@ -627,11 +634,17 @@ exports.init = function init(ctx) {
       // Freeze card heights inside clones to avoid size jumps during animation
       try {
         const aCards = Array.from(fromClone.querySelectorAll('.card'));
-        aCards.forEach((el, i) => { const h = fromCardHeights[i] || el.offsetHeight || 0; if (h) { el.style.height = h + 'px'; } });
+        aCards.forEach((el, i) => {
+          const h = fromCardHeights[i] || 0;
+          if (h) { el.style.boxSizing = 'border-box'; el.style.height = Math.round(h) + 'px'; }
+        });
       } catch {}
       try {
         const bCards = Array.from(toClone.querySelectorAll('.card'));
-        bCards.forEach((el, i) => { const h = toCardHeights[i] || el.offsetHeight || 0; if (h) { el.style.height = h + 'px'; } });
+        bCards.forEach((el, i) => {
+          const h = toCardHeights[i] || 0;
+          if (h) { el.style.boxSizing = 'border-box'; el.style.height = Math.round(h) + 'px'; }
+        });
       } catch {}
 
       // Order based on direction

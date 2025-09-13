@@ -78,11 +78,11 @@ exports.init = function init(ctx) {
           <div class="sub">Uses your current Windows desktop wallpaper.</div>
         </div>
  
-          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Sidebar Auto Hide</div>
+          <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted);">Sidebar Visible</div>
           <div style="display:flex; gap:8px; align-items:center;">
             <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-              <input type="checkbox" id="autoHideToggle" ${sidebarCfg.autoHide ? 'checked' : ''} style="width:18px; height:18px;">
-              <span>Enable Auto Hide</span>
+              <input type="checkbox" id="autoHideToggle" ${(!sidebarCfg.autoHide) ? 'checked' : ''} style="width:18px; height:18px;">
+              <span>Show left sidebar</span>
             </label>
           </div>
         </div>
@@ -239,6 +239,16 @@ exports.init = function init(ctx) {
               <span>Enable dashboard header (pages, edit, columns)</span>
             </label>
           </div>
+          <div>
+            <div class="label" style="text-transform:uppercase; letter-spacing:.6px; font-size:12px; color:var(--muted); margin-bottom:6px;">Sidebar Visible</div>
+            <label style="display:flex; align-items:center; gap:10px; height:32px;">
+              <input id="autoHideToggle" type="checkbox" ${(!sidebar.autoHide) ? 'checked' : ''} style="width:0;height:0;opacity:0;position:absolute;" />
+              <div id="autoHideSwitch" style="width:52px; height:28px; border-radius:999px; background:${(!sidebar.autoHide)?'var(--accent)':'rgba(255,255,255,0.15)'}; position:relative; transition:background .2s; border:1px solid rgba(255,255,255,0.15);">
+                <div style="position:absolute; top:2px; left:${(!sidebar.autoHide)?'26px':'2px'}; width:24px; height:24px; background:#fff; border-radius:999px; transition:left .2s;"></div>
+              </div>
+              <span>Show/Hide the left sidebar</span>
+            </label>
+          </div>
         </div>
       </div>
     `;
@@ -337,12 +347,41 @@ exports.init = function init(ctx) {
       const knob = navToggle.firstElementChild; if (knob) knob.style.left = navChk.checked ? '26px' : '2px';
     };
     const syncNavToConfig = () => {
-      try { (config.dashboard = config.dashboard || {}).navEnabled = !!navChk.checked; } catch {}
+      try {
+        const enabled = !!navChk.checked;
+        // Legacy/global location
+        (config.dashboard = config.dashboard || {}).navEnabled = enabled;
+        // Current per-app dashboards
+        const dashboards = (config.dashboards = config.dashboards || {});
+        Object.keys(dashboards).forEach(id => {
+          dashboards[id] = dashboards[id] || {};
+          dashboards[id].navEnabled = enabled;
+        });
+      } catch {}
       try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
     };
     navToggle?.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); navChk.checked = !navChk.checked; updateNavToggle(); syncNavToConfig(); });
     navChk?.addEventListener('change', ()=>{ updateNavToggle(); syncNavToConfig(); });
     updateNavToggle();
+
+    // Sidebar auto-hide toggle visual + sync
+    const ahChk = generalBox.querySelector('#autoHideToggle');
+    const ahSwitch = generalBox.querySelector('#autoHideSwitch');
+    const updateAh = () => {
+      if (!ahSwitch || !ahChk) return;
+      // Checked = Sidebar Visible => accent background
+      ahSwitch.style.background = ahChk.checked ? 'var(--accent)' : 'rgba(255,255,255,0.15)';
+      const knob = ahSwitch.firstElementChild; if (knob) knob.style.left = ahChk.checked ? '26px' : '2px';
+    };
+    const syncAhToConfig = () => {
+      try { (config.sidebar = config.sidebar || {}).autoHide = !ahChk.checked; } catch {}
+      try { window.dispatchEvent(new CustomEvent('config-updated', { detail: config })); } catch {}
+    };
+    ahSwitch?.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); ahChk.checked = !ahChk.checked; updateAh(); syncAhToConfig(); });
+    ahChk?.addEventListener('change', ()=>{ updateAh(); syncAhToConfig(); });
+    updateAh();
+
+    // (auto-hide toggle handled above with visual sync)
   }
 
   function renderSettings() {
@@ -499,9 +538,15 @@ exports.init = function init(ctx) {
       const themeEl = generalBox?.querySelector('#genTheme');
       config.theme = themeEl?.value || config.theme || 'auto';
  
-      // dashboard nav toggle
+      // dashboard nav toggle (mirror to all per-app dashboards too)
       const navEl = generalBox?.querySelector('#genDashNav');
-      (config.dashboard = config.dashboard || {}).navEnabled = !!(navEl ? navEl.checked : true);
+      const navEnabled = !!(navEl ? navEl.checked : true);
+      (config.dashboard = config.dashboard || {}).navEnabled = navEnabled;
+      const dashboards = (config.dashboards = config.dashboards || {});
+      Object.keys(dashboards).forEach(id => {
+        dashboards[id] = dashboards[id] || {};
+        dashboards[id].navEnabled = navEnabled;
+      });
 
       // background settings
       const modeEl = generalBox?.querySelector('#bgMode');
@@ -541,7 +586,7 @@ exports.init = function init(ctx) {
       if (Number.isFinite(lonVal)) config.longitude = lonVal;
  
       const autoHideEl = generalBox?.querySelector('#autoHideToggle');
-      sidebarCfg.autoHide = autoHideEl ? autoHideEl.checked : false;
+      if (autoHideEl) { sidebarCfg.autoHide = !autoHideEl.checked; }
  
 
       // collect apps

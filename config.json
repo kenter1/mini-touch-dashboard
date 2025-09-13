@@ -61,7 +61,7 @@
   ],
   "sidebar": {
     "itemsPerPage": 5,
-    "autoHide": false
+    "autoHide": true
   },
   "dashboard": {
     "pages": [
@@ -105,7 +105,8 @@
             }
           ]
         }
-      ]
+      ],
+      "navEnabled": false
     },
     "default": {
       "pages": [
@@ -145,11 +146,11 @@
           "split": true
         },
         {
-          "columns": 3,
+          "columns": 6,
           "widgets": [
             {
               "type": "iframe",
-              "span": 1,
+              "span": 2,
               "col": 0,
               "row": 0,
               "rspan": 2,
@@ -162,11 +163,25 @@
             },
             {
               "type": "weather",
-              "span": 1,
-              "col": 2,
+              "span": 2,
+              "col": 5,
               "row": 0,
               "rspan": 1,
               "invisible": false
+            },
+            {
+              "type": "gpu",
+              "span": 1,
+              "col": 2,
+              "row": 1,
+              "rspan": 1
+            },
+            {
+              "type": "cpu",
+              "span": 1,
+              "col": 3,
+              "row": 1,
+              "rspan": 1
             }
           ],
           "split": true
@@ -190,15 +205,15 @@
           "split": true
         }
       ],
-      "pageIndex": 0,
-      "navEnabled": true
+      "pageIndex": 1,
+      "navEnabled": false
     }
   },
   "background": {
     "mode": "windows"
   },
   "ui": {
-    "widgetGlassOpacity": 4,
+    "widgetGlassOpacity": 62,
     "widgetBackgroundVisible": true
   },
   "city": "Orlando, Florida"
